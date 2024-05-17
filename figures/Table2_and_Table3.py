@@ -1,33 +1,23 @@
 import numpy as np
 import sys
-sys.path.insert(1, '../model')
-sys.path.insert(1, '../algorithms')
+sys.path.insert(1, '..')
 import time
-import sigpy
+import cmath
+from scipy.ndimage import zoom
+from skimage.color import rgb2hsv
+import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+colors = ["black", "lightgray", "black"]
+cmap = LinearSegmentedColormap.from_list("", colors)
+from PIL import Image
 
 import forward as forward
+import utility_2D as util
 
 import adp as adp
 
 
-import utility_2D as util
-from scipy.ndimage import zoom
-
-
-from skimage.color import rgb2hsv
-
-
-from matplotlib import rcParams
-rcParams['font.family'] = 'STIXGeneral'
-rcParams['mathtext.fontset'] = 'cm'
-rcParams.update({'font.size': 18})
-
-from matplotlib.colors import LinearSegmentedColormap
-
-colors = ["black", "lightgray", "black"]
-cmap = LinearSegmentedColormap.from_list("", colors)
-
-
+### Helper functions ###
 
 def image_to_object(im,satur_parser):
     im_hsv = rgb2hsv(im)
@@ -38,7 +28,6 @@ def image_to_object(im,satur_parser):
     obj_mod = modulus * np.exp(1.0j * phase)  
     
     return obj_mod
-
 
 def image_to_phase_object(im,satur_parser):
     im_hsv = rgb2hsv(im)
@@ -51,7 +40,6 @@ def image_to_phase_object(im,satur_parser):
     return obj_mod
 
 
-
 ## for Table 2: phase_object = 0
 ## for Table 3: phase_object = 1  
 
@@ -62,11 +50,9 @@ if phase_object == 1:
 else:
     import wigner_with_background_removal as wdd_background
 
+### Load cameraman and transfrom it ###
 
-
-from PIL import Image
 im_cam = Image.open("cameraman.tif")
-
 im_cam = np.array(im_cam)
 
 outd = 64 #96 
@@ -76,30 +62,20 @@ im[:,:,0] = zoom(im_cam[:,:],factor)
 im[:,:,1] = zoom(im_cam[:,:],factor)
 im[:,:,2] = zoom(im_cam[:,:],factor)
 
-
-
 if phase_object == 1:
     obj = image_to_phase_object(im,lambda x,v: x)
 else:
     obj = image_to_object(im,lambda x,v: x)
-    
 
+### Parameter Setup ###
 
 d = im.shape[0]
-
-
 delta = 8 #16
 shift = 1
-
-
 f_dim = (d,d)
-
 dsize = f_dim
 
-
-locations_2d = forward.loc_grid_circ((d,d),(shift,shift), False)
-
-
+### Construct Gaussian window ###
 
 cov_mat = np.eye(2,dtype = complex)/0.05
 mu = np.array([0.5 + delta*0.5, 0.5 + delta*0.5])
@@ -109,6 +85,8 @@ for ix in range(delta):
     for iy in range(delta):
         window[ix,iy] = gauss( np.array([ix+1, iy+1]))
 
+### Randomize it to avoid symmetry singularities ###
+
 np.random.seed(1); r1 = np.random.rand(delta,delta)
 np.random.seed(5); r2 = np.random.rand(delta,delta)
 if (np.mod(d,2) == 0):
@@ -116,6 +94,7 @@ if (np.mod(d,2) == 0):
 else:
     window = window *np.exp(2j*r1) 
 
+### Prepare ptycho object and generate the forward measurements ###   
 
 par = forward.ptycho(
             object_shape = obj.shape,
@@ -126,24 +105,20 @@ par = forward.ptycho(
             fourier_dimension = f_dim,
             float_shift = False)
 
-
 print('Computing forward model')
 f = par.forward_2D_pty(obj)
 
 print('Computing measurements')
 b = par.forward_to_meas_2D_pty(f)
 
+### Background ###
 
-
-
-### Background Noise ###
-
-phantom = sigpy.shepp_logan(dsize, dtype='float64')*255 
+phantom =  Image.open("phantom.tif")
+phantom = np.array(phantom)
 
 background = np.zeros(b.shape,dtype = 'float64')
 for r in range(b.shape[2]):
             background[:,:,r] = phantom
-
 
 noise_level = 3.5
 scaling = (noise_level * np.linalg.norm(b) /  np.linalg.norm(background) )  
@@ -177,14 +152,11 @@ start_time = time.time()
 obj_r = wignerb.run()
 end_time = time.time()
 
-
 obj_r = util.align_objects(obj,obj_r,par.mask)
 
 print('Time: ', end_time - start_time)
-
 f_r = par.forward_2D_pty(obj_r)
 b_r = par.forward_to_meas_2D_pty(f_r)
-
 print('Reconstruction:')
 print( 'Relative error: ', util.relative_error(obj,obj_r,par.mask) )
 print( 'Relative measurement error: ', util.relative_measurement_error(b,b_r))
@@ -205,38 +177,28 @@ wignerb = wdd_background.wdd_background(b_n,
                   sbc_threshold = 0.0,
                   memory_saving = False)
 
-
 print('Reconstructing...')
 
 start_time = time.time()
 obj_r = wignerb.run()
 end_time = time.time()
 
-
 obj_r = util.align_objects(obj,obj_r,par.mask)
 
 print('Time: ', end_time - start_time)
-
 f_r = par.forward_2D_pty(obj_r)
 b_r = par.forward_to_meas_2D_pty(f_r)
-
 print('Reconstruction:')
 print( 'Relative error: ', util.relative_error(obj,obj_r,par.mask) )
 print( 'Relative measurement error: ', util.relative_measurement_error(b,b_r))
 
 
-if phase_object == 1:
-    obj_r_init = obj_r.copy()
-
-
-
-
 ### ADP ###
-
+locations_2d = forward.loc_grid_circ((d,d),(shift,shift), False)
 positions = locations_2d
 
 J = d**2
-alpha1 = 0 #not required
+alpha1 = 0 
 alpha2 = 0.5
 r = 10**(-6)
 K = 10 
@@ -249,10 +211,8 @@ start_time = time.time()
 obj_r_adp, background_r, rel_err_adp_1_init, meas_err_adp_1_init = adp.ADP(window,b_n,d,delta,1,J,positions,K,alpha1,alpha2,r,J_0,obj_wdd,background_init,obj,b)
 end_time = time.time()
 print('Time: ', end_time - start_time)
-
 obj_r_adp = obj_r_adp[0:d,0:d]
 obj_r_adp = util.align_objects(obj,obj_r_adp,par.mask)
-
 
 print( 'Relative error: ', util.relative_error(obj,obj_r_adp,par.mask) )
 f_r = par.forward_2D_pty(obj_r_adp)
