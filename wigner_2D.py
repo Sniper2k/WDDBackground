@@ -1,3 +1,102 @@
+### Authors: Oleh Melnyk and Patricia Römer
+#
+### Wigner Distribution Deconvolution (WDD) implementation 
+# Consists of 3 mains steps and 1 optional step
+# Main: 
+# 1) Inversion step
+# 2) Magnitude estimation
+# 3) Phase synchronization
+#
+# Optional:
+# 1.5) Background Removal    
+# 
+# Implementation is based on 
+# Section 3.6 in [1] Oleh Melnyk, Phase Retrieval from Short-Time Fourier Measurements and Applications to Ptychography, PhD thesis, Technische Universitaet Muenchen, 2023
+# and
+# [2] Oleh Melnyk, Patricia Römer, Background Denoising for Ptychography via Wigner Distribution Deconvolution
+#
+# Required parameters:
+# --> ptycho: 
+# Type: object from forward, describes the forward model 
+# For WDD, scanning positions ptycho.locations should form a equdistant grid with step ptycho.shift.
+# Furthermore, the shifts are circular, so that ptycho.circular = True. 
+# If ptycho.circular = False, algorithm works and treats in two possible ways, see parameter add_dummy below. 
+# If ptycho.shift > 1, then the object to be recovered is assumed to be block-constant, see Section 3.6.5.1 in [1]    
+#
+# Optional parameters:
+# --> gamma 
+# Type: integer from 1 to self.par.window_shape[0]//self.par.shift[0] (all diagonals)
+# Default: all diagonals) 
+# number of diagonals to use for reconstruction. See Assumption A in [2] for details.
+# 
+# --> reg_type
+# Type: string, either 'value' or 'percent'
+# Default: 'value'
+# --> reg_threshold
+# Type: float  
+# Default: 0.0
+# Parameters for regularization of the inversion step by truncation, see Section 3.6.2.2 in [1]
+# When 'value' is chosen, diagonal Fourier coefficients corresponding to singular values below reg_threshold are set to zero
+# When 'percent' is chosen, diagonal Fourier coefficients corresponding to singular values less then quantile(reg_threshold) are set to zero 
+#
+# --> mg_type
+# Type: string, either 'diag' or 'log'
+# Default: 'diag'
+# Determines, which magnitude estimation method to use, see Section 3.6.3 in [1]
+#
+# --> mg_diagonals_type
+# Type: string, either 'all', 'value' or 'percent'
+# Default: 'all'
+# --> mg_diagonals_param
+# Type: float 
+# mg_diagonals_type determines whether all diagonals should be used for magnitude estimation. 
+# If 'value', only mg_diagonals_param of the first diagonals are used, in analogy for gamma 
+# If 'percent', only diagonals where percentage of non-truncated Fourier coefficients exceeds mg_diagonals_param are used.
+# For details, see Section 6.1.2.2 in [1]
+#
+# -->as_wtype
+# Type: string, either 'unweighted','weighted' or 'weighted_sq_amp'
+# Default: 'weighted'
+# Choice of weights for phase synchronization. These three choices were discussed in Section 3.6.4 in [1]
+# Uses mg_diagonals_type, mg_diagonals_param the same way as magnitude estimation in case memory_saving=True. 
+#
+# --> as_threshold
+# Type: float 
+# Default: 10**-10
+# When constructing the graph for phase syncronization from lifted matrix, its entries below as_threshold 
+# are treated as zeros. In other words, the corresponding phase differences are not used.
+#
+# --> background 
+# Type: string, either 'none','general' or 'phase'
+# Default: 'none'
+# 
+# --> add_dummy
+# Type: bool
+# Default: False
+# Only considered when using WDD for noncircular measurements (ptycho.circular = False)
+# When False, there is less measurements than WDD needs. Recomendation to change 
+# the dimension d to d - window.shape / shift + 1  
+# When True, dimensional changes are not required. Instead, the algorithm will set the 
+# missing diffraction patters to 0. This results in border in the reconstruction
+#
+# --> memory_saving
+# Type: bool
+# Default: False
+# If False, the straightforward implementation of WDD constructs banded matrix 
+# X = T(xx^*), see Section 6.3.1 in [1]. However, as number of recovered diagonalls 
+# gamma is typically much smaller than the dimension d, entries of X are mostly zeros,
+# consuming the memory, especially in 2D. Setting memory_saving to True, avoids construction
+# of X and performs magnitude and phase estimation directly from the diagonals.
+# This results in a smaller memmory consumption, however slows down the reconstruction
+# as the phase estimation runs power method instead of using scipy.sparse.linalg.eigsh    
+#
+# --> xt
+# Type: np.ndarray
+# Default: empty
+# Groundtruth object for testing purposes.
+#
+# --> subspace completing parameters can be ignored
+
 import numpy as np
 import copy
 from scipy.sparse.linalg import eigsh
@@ -21,7 +120,9 @@ class wdd:
         #### GAMMA ###
         
         if 'gamma' in kwargs.keys():
-            self.gamma = kwargs['gamma']    
+            self.gamma = kwargs['gamma']
+        else:
+            self.gamma = self.par.window_shape[0]//self.par.shift[0]
         
         
         ###### REGULARIZATION PARAMETERS ######
@@ -103,7 +204,6 @@ class wdd:
         else:
             self.mg_type = 'diag'
         
-        # if self.mg_type in ['log']:
         if 'mg_diagonals_type' in kwargs.keys():
             if not isinstance(kwargs['mg_diagonals_type'], str):
                 print('mg_diagonals_type is given, but not a string. Set to all.')
@@ -216,12 +316,21 @@ class wdd:
         if (self.par.circular == False and self.add_dummy == True):
             self.object_shape_ext = self.par.object_shape + self.par.window_shape
         
-        # If shift>1, compute shift size dimensions
+        # If shift>1, we switch from working with actual entries and switch to 
+        # blocks of size shift. Thus, we set up dimensions in block-units 
+        # For shift, block-unit is a single entry.
         self.dim_c = (self.par.object_shape[0]//self.par.shift[0],self.par.object_shape[1]//self.par.shift[1])
         self.dim_c_ext = (self.object_shape_ext[0]//self.par.shift[0],self.object_shape_ext[1]//self.par.shift[1])
         self.wnd_size_c = (self.par.window_shape[0]//self.par.shift[0],self.par.window_shape[1]//self.par.shift[1])
-
+        
+     
     def compute_singular_values(self):
+        # Precomputation of the singular values based on eq. (3.38) in [1]
+        # In 1D, there is a symmetry between the singular values with positive and negative index, see (22) in [2]
+        # This is also true, however, only for the first index, while the second index can be negative
+        # Thus, we split nonnegative second indices in self.singular_values 
+        # and negative to self.singular_values_neg
+        
         self.singular_values = np.zeros((self.dim_c_ext[0],self.dim_c_ext[1],self.wnd_size_c[0],self.wnd_size_c[1]),dtype = complex)
         self.singular_values_neg = np.zeros((self.dim_c_ext[0],self.dim_c_ext[1],self.wnd_size_c[0],self.wnd_size_c[1]-1),dtype = complex)
         
@@ -234,16 +343,15 @@ class wdd:
             else:
                 gamma2 = gamma1 - k0    
         
-        #for k0 in range(self.wnd_size_c[0]):
+            # Compute (3.38) in [1]
+        
             # positive second index 
-            for k1 in range(gamma2):#(self.wnd_size_c[1]):
-                # # Compute compressed window
+            for k1 in range(gamma2):
                 w = np.zeros(self.dim_c_ext,dtype = complex)
                 w1 = self.par.window[k0*self.par.shift[0]:,k1*self.par.shift[1]:]
                 w1 = w1*self.par.window[:w1.shape[0],:w1.shape[1]].conj()
                 w2 = np.zeros_like(self.par.window,dtype = complex)
                 w2[:w1.shape[0],:w1.shape[1]] = w1
-                # w[:w1.shape[0],:w1.shape[1]] = w1
                 for n0 in range(self.wnd_size_c[0]):
                     for n1 in range(self.wnd_size_c[1]):
                         w[n0,n1] = np.sum(w2[n0*self.par.shift[0]:(n0+1)*self.par.shift[0],n1*self.par.shift[1]:(n1+1)*self.par.shift[1]],axis =None)
@@ -251,7 +359,7 @@ class wdd:
                 w_fft = w_fft.conj()    
                 
                 self.singular_values[:,:,k0,k1] = w_fft
-                
+                 
             # negative second index
             for k1 in range(gamma2 - 1):
                 # # Compute compressed window
@@ -274,6 +382,7 @@ class wdd:
                 
                 self.singular_values_neg[:,:,k0,k1] = w_fft
        
+        # Construct bool flags for the singular values to be truncated 
        
         if self.reg_type == 'value':
              self.reg_param = self.reg_threshold
@@ -287,10 +396,13 @@ class wdd:
         
         
     def construct_diagonals_fft(self):
+        # Implementation of the inversion step
         h1 = self.par.fourier_dimension[0] // 2 
         h2 = self.par.fourier_dimension[1] // 2
         
         print('Inversion...')
+        
+        # Center patter at (0,0) and apply 2D transform to the measurements in frequency domain 
         b_shifted = np.zeros_like(self.b,dtype = complex)
         b_shifted = np.roll(self.b, -h2, axis=1)    
         b_shifted = np.roll(b_shifted, -h1, axis=0)
@@ -301,11 +413,13 @@ class wdd:
             b_iift[:,:,s] = np.fft.ifft2(b_shifted[:,:,s])
             # m[:,:,s] = np.fft.fft2(m_iift[:,:,s])
         
-        # For each frequency divisible by shift recover compressed diagonal
+        # For each frequency divisible by shift recover block-unit diagonal
           
         self.diags_fft = np.zeros( (self.dim_c_ext[0], self.dim_c_ext[1],self.wnd_size_c[0],self.wnd_size_c[1]), dtype = complex)
         self.diags_fft_neg = np.zeros( (self.dim_c_ext[0], self.dim_c_ext[1],self.wnd_size_c[0],self.wnd_size_c[1]-1), dtype = complex) 
                
+        # Construct empty diffraction pattern
+        
         diff_pat_ifft_dummy = np.zeros(self.par.fourier_dimension, dtype = complex)
         
         # number of given scan positions
@@ -316,8 +430,9 @@ class wdd:
                  
         gy,gx = np.meshgrid(range(self.dim_c_ext[0]), range(self.dim_c_ext[1]))
        
-       
         gamma = self.gamma
+        
+        # Recover diagonals by dividing corresponding measurents with the singular values
         
         print(gamma)   
         for k0 in range(gamma):
@@ -366,13 +481,13 @@ class wdd:
                 f_mode = np.exp(-2j*np.pi*(gx*k0*1.0/self.dim_c_ext[0] - gy*(k1+1)*1.0/self.dim_c_ext[1]))
                 self.diags_fft_neg[:,:,k0,k1] *= f_mode
                
+        # Truncate
         
-        
-        # above_threshold_idx = np.abs(self.singular_values) > self.reg_param
         self.diags_fft[~self.above_threshold] = 0
         self.diags_fft_neg[~self.above_threshold_neg] = 0
         
     def background_general_coefficient_recovery(self):
+        # Removes background according to Algorithm 2 in [2]
         print('Background coefficient recovery...')
         
         # Discard zeroth frequencies (contain background information)
@@ -395,9 +510,10 @@ class wdd:
                 
                 count += 1
                 
+                # construct linear system based on equations (12), (13) in [2]
                 A = np.zeros(((size_lin_syst ** 2),2),dtype = 'complex')
                 y = np.zeros((size_lin_syst ** 2,1),dtype = 'complex')
-                
+                 
                 for s0 in range(size_lin_syst):
                     for s1 in range(size_lin_syst):
                         
@@ -459,7 +575,7 @@ class wdd:
                 
                 self.diags_fft_neg[0,0,k0,k1] =  x[0] + 1.0j * x[1] 
         
-        # Reconstruct f_0^0
+        # Reconstruct f_0^0 according to (14) in [2]
         
         c_0 = np.zeros((self.wnd_size_c[0],self.wnd_size_c[1]), dtype = 'complex')
      
@@ -493,6 +609,7 @@ class wdd:
         self.diags_fft_neg[~self.above_threshold_neg] = 0
         
     def background_phase_coefficient_recovery(self): 
+        # Removes background according to Algorithm 3 in [2]
         print('Background coefficient recovery...')
         
         diags_w_background = self.diags_fft[0,0,:,:] * 1
@@ -518,14 +635,17 @@ class wdd:
             for k1 in range(gamma2):
                 
                 if k0 + k1 > 0:
-                
+                    # Compute magnitude according to Proposition 9 in [2]
+                    
                     sum_diags = 0
                     for j0 in range(self.dim_c_ext[0]):
                         for j1 in range(self.dim_c_ext[1]):
                                 sum_diags += np.abs(self.diags_fft[j0,j1,k0,k1])**2
                    
                     f0_abs =  np.sqrt(np.max([d**2 - sum_diags,10**(-8)]))
- 
+                    
+                    # Find the angle by approximately solving linear system (16) in [2] 
+                    
                     a0 = 0
                     for j0 in range(self.dim_c_ext[0]):
                         for j1 in range(self.dim_c_ext[1]):
@@ -607,6 +727,7 @@ class wdd:
                         
                     self.diags_fft[0,0,k0,k1] = f    
                 
+            # repeat for negative indices    
             for k1 in range(gamma2 - 1):
                  
                 sum_diags = 0
@@ -698,7 +819,7 @@ class wdd:
         
         self.diags_fft[0,0,0,0] = d        
         
-        
+          
         self.diags_fft[~self.above_threshold] = 0
         self.diags_fft_neg[~self.above_threshold_neg] = 0
         
@@ -765,29 +886,20 @@ class wdd:
         
         self.diags[:,:,(self.wnd_size_c[0]-1):, :(self.wnd_size_c[1]-1)] =  diags_neg
     
-    def multiply_via_diag(self, matrix, vector):
-        prod = np.zeros(self.dim_c_ext, dtype = complex )
-        dd0m1 = 2*self.wnd_size_c[0] - 1
-        dd1m1 = 2*self.wnd_size_c[1] - 1
-        
-        for k0 in range(dd0m1):
-            vector_t0 = np.roll(vector, -k0 + self.wnd_size_c[0]-1, axis = 0)
-            for k1 in range(dd1m1):
-                vector_t1 = np.roll(vector_t0, -k1 + self.wnd_size_c[1]-1, axis = 1)
-                prod += matrix[:,:,k0,k1] * vector_t1
-                
-        return prod
                         
     def reconstruct_magnitudes_from_lifted_matrix(self):
         print('Magnitude estimation...')
     
         if self.mg_type == 'diag':
+            # Use main diagonal
             self.x_mag = np.sqrt(np.abs(np.diag(self.x_lifted_comp)))
         elif self.mg_type == 'block_mag':
             # TBD
             print('Not implemented. Please, use diag or log instead. Used diag')
             self.x_mag = np.sqrt(np.abs(np.diag(self.x_lifted_comp)))
         elif self.mg_type == 'log':
+            # Use log magnitude estimation method
+            
             idx_0 = np.abs(self.x_lifted_comp) > 0
             idx = np.abs(self.x_lifted_comp) <= self.as_threshold
             idx_0_tr = idx_0 & idx
@@ -839,7 +951,7 @@ class wdd:
                 idx_gamma = B_lam[dist[0,:,:],dist[1,:,:]] == 0
                 idx_0_tr = idx_0_tr & ~idx_gamma
                 idx = idx | idx_gamma
-            
+            # compute B^T m 
             Ab = np.zeros_like(self.x_lifted_comp)
             Ab[~idx] = np.log(np.abs(self.x_lifted_comp[~idx]))
             Ab[idx_0_tr] = self.as_threshold
@@ -849,6 +961,8 @@ class wdd:
             
             B_lam_ifft = np.fft.ifft2(B_lam)
             idx2 = np.abs(B_lam_ifft) > self.as_threshold
+            
+            # invert the resulting system using FFT
             
             Btm_res = np.reshape(Btm, self.dim_c_ext,'C')
             Btm_res = np.fft.fft2(Btm_res)
@@ -869,9 +983,12 @@ class wdd:
             print('Not implemented. Please, use diag or log instead. Used diag')
             self.x_mag = np.sqrt(np.abs(np.diag(self.x_lifted_comp)))
         elif self.mg_type == 'log':
+            # Use log magnitude estimation method
             idx_0 = np.abs(self.diags) > 0
             idx = np.abs(self.diags) <= self.as_threshold
             idx_0_tr = idx_0 & idx
+            
+            # filter used diagonals 
             
             used_diags = np.ones(self.wnd_size_c)
             used_diags_neg = np.ones( (self.wnd_size_c[0],self.wnd_size_c[1]-1) )
@@ -893,6 +1010,7 @@ class wdd:
                 if (np.sum(used_diags) + np.sum(used_diags_neg) == 0):
                     used_diags[0,0]=1 
             
+            # construct a slice of matrix B 
             B_lam = np.zeros(self.dim_c_ext)
             B_lam[:self.wnd_size_c[0],:self.wnd_size_c[1]] = used_diags
             B_lam[(self.dim_c_ext[0]-self.wnd_size_c[0]+1):,(self.dim_c_ext[1]-self.wnd_size_c[1]+1):] = np.flip(used_diags[1:,1:], axis = (0,1))
@@ -913,11 +1031,13 @@ class wdd:
                 idx[:,:,unused_diags==0] = True
                 idx_0_tr[:,:,unused_diags==0] = False
                  
-            
+            # compute right-hand side
             Ab = np.zeros_like(self.diags)
             Ab[~idx] = np.log(np.abs(self.diags[~idx]))
             Ab[idx_0_tr] = self.as_threshold
             Btm = np.sum(Ab,axis=(2,3)) + Ab[:,:,self.wnd_size_c[0]-1,self.wnd_size_c[1]-1]
+            
+            # invert the system
             
             B_lam_ifft = np.fft.ifft2(B_lam)
             idx2 = np.abs(B_lam_ifft) > self.as_threshold
@@ -935,12 +1055,14 @@ class wdd:
     def angular_sync_from_lifted_matrix(self):    
         print('Phase estimation...')
     
+        # Construct graph weight matrix 
         if self.as_wtype == 'weighted':
             idx = np.abs(self.x_lifted_comp) > self.as_threshold
             weights = np.abs(self.x_lifted_comp) * idx 
         elif self.as_wtype == 'unweighted':
             weights = (np.abs(self.x_lifted_comp) > self.as_threshold).astype(float)
     
+        # Construct data-dependent graph Laplacian and compute its smallest eigenvalue
         idx = weights > 0
         ph_diff = np.zeros_like(self.x_lifted_comp)
         ph_diff[idx] = self.x_lifted_comp[idx]/np.abs(self.x_lifted_comp[idx])
@@ -953,16 +1075,32 @@ class wdd:
         self.phases[idx] = self.phases[idx]/np.abs(self.phases[idx]) 
         self.phases[~idx] = 1
     
+    def multiply_via_diag(self, matrix, vector):
+        # memory efficient multiplication with banded matrices defined by diagonals
+        prod = np.zeros(self.dim_c_ext, dtype = complex )
+        dd0m1 = 2*self.wnd_size_c[0] - 1
+        dd1m1 = 2*self.wnd_size_c[1] - 1
+        
+        for k0 in range(dd0m1):
+            vector_t0 = np.roll(vector, -k0 + self.wnd_size_c[0]-1, axis = 0)
+            for k1 in range(dd1m1):
+                vector_t1 = np.roll(vector_t0, -k1 + self.wnd_size_c[1]-1, axis = 1)
+                prod += matrix[:,:,k0,k1] * vector_t1
+                
+        return prod
+    
     def angular_sync_from_diags(self):    
         print('Phase estimation...')
     
+        # Construct graph weight matrix 
+        
         if self.as_wtype == 'weighted':
             idx = np.abs(self.diags) > self.as_threshold
             weights = np.abs(self.diags) * idx 
         elif self.as_wtype == 'unweighted':
             weights = (np.abs(self.diags) > self.as_threshold).astype(float)
         
-        
+        # filter diagonals 
         used_diags = np.ones(self.wnd_size_c)
         used_diags_neg = np.ones( (self.wnd_size_c[0],self.wnd_size_c[1]-1) )
         if self.mg_diagonals_type == 'value':
@@ -993,6 +1131,8 @@ class wdd:
             # unused_diags = 1- unused_diags
             
             idx[:,:,unused_diags==0] = True
+        
+        # Construct Laplacian 
         
         weights[idx] = 0
         
@@ -1041,6 +1181,9 @@ class wdd:
             x_compressed = np.reshape(x_vec,self.dim_c_ext)
             
         x_compressed_cutted = x_compressed[:self.dim_c[0],:self.dim_c[1]]
+        
+        # Return from block-units to entries
+        
         x = np.repeat(x_compressed_cutted, self.par.shift[0], axis = 0)
         x = np.repeat(x, self.par.shift[1], axis = 1)
 
@@ -1051,7 +1194,7 @@ class wdd:
         self.construct_diagonals_fft()
         
         if self.subspace_completion:
-            self.subspace_completion()
+            print('Not supported in 2D')
             
         if self.background == 'general':
             self.background_general_coefficient_recovery()
