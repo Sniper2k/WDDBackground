@@ -2,16 +2,12 @@ import numpy as np
 import sys
 sys.path.insert(1, '..')
 import time
-import sigpy
-import cmath
+
 from scipy.ndimage import zoom
-from skimage.color import rgb2hsv
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
-colors = ["black", "lightgray", "black"]
-cmap = LinearSegmentedColormap.from_list("", colors)
 from PIL import Image
 
+import helper
 import utility_2D as util
 import forward as forward
 
@@ -19,17 +15,6 @@ import wigner_2D as wdd
 
 import adp as adp
 
-### Helper functions ###
-
-def image_to_object(im,satur_parser):
-    im_hsv = rgb2hsv(im)
-       
-    modulus = im_hsv[:,:,2] * 255 
-    phase = (modulus - np.min(modulus)) / (np.max(modulus) - np.min(modulus)) * 2*np.pi - np.pi
-    
-    obj_mod = modulus * np.exp(1.0j * phase)
-    
-    return obj_mod
     
 ### Load cameraman and transfrom it ###
 
@@ -43,7 +28,7 @@ im[:,:,0] = zoom(im_cam[:,:],factor)
 im[:,:,1] = zoom(im_cam[:,:],factor)
 im[:,:,2] = zoom(im_cam[:,:],factor)
 
-obj = image_to_object(im,lambda x,v: x)
+obj = helper.image_to_object(im,lambda x,v: x)
 
 ### Parameter Setup ###
 

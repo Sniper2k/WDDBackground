@@ -207,8 +207,6 @@ class wdd:
         if 'xt' in kwargs.keys():
             self.xt = kwargs['xt']
             
-        # self.wddpar = wddpar
-        # self.par = wddpar.ptycho_params
         self.object_shape_ext = self.par.object_shape
         
         # If we don't work with circular object and measurements,
@@ -307,18 +305,8 @@ class wdd:
           
         self.diags_fft = np.zeros( (self.dim_c_ext[0], self.dim_c_ext[1],self.wnd_size_c[0],self.wnd_size_c[1]), dtype = complex)
         self.diags_fft_neg = np.zeros( (self.dim_c_ext[0], self.dim_c_ext[1],self.wnd_size_c[0],self.wnd_size_c[1]-1), dtype = complex) 
-        
-        # add dummy measurements
-        # x_dummy = np.ones(self.par.window_shape,dtype=complex)
-        # x_dummy = x_dummy / np.linalg.norm(x_dummy,'fro') * np.sqrt(np.sum(self.b)) / np.linalg.norm(self.par.window,'fro')
-        # forw_dummy = self.par.forward_2D_os(x_dummy)
-        # diff_pat_dummy = np.abs(forw_dummy)**2
-        # diff_pat_dummy = np.roll(diff_pat_dummy, -h2, axis=1)    
-        # diff_pat_dummy = np.roll(diff_pat_dummy, -h1, axis=0)
-        # diff_pat_ifft_dummy = np.fft.ifft2(diff_pat_dummy)
-        
+               
         diff_pat_ifft_dummy = np.zeros(self.par.fourier_dimension, dtype = complex)
-        # diff_pat_ifft_dummy[:,:] = 0.0
         
         # number of given scan positions
         if (self.par.circular == False):
@@ -718,9 +706,6 @@ class wdd:
         print('Lifted matrix construction...')
         self.x_lifted_comp = np.zeros( (np.prod(self.dim_c_ext),np.prod(self.dim_c_ext)), dtype = complex)
              
-        
-        # lpos =  []
-        # lneg =  []
         # Add reconstructed diagonals to the rank-one matrix
         for k0 in range(self.wnd_size_c[0]):
             
@@ -734,26 +719,19 @@ class wdd:
                         n1mk1_circ = (n1 - k1) % self.dim_c_ext[1]
                         self.x_lifted_comp[n0mk0_circ*self.dim_c_ext[1] + n1mk1_circ,n0* self.dim_c_ext[1] + n1] = dk[n0,n1].conj()
                         self.x_lifted_comp[n0* self.dim_c_ext[1] + n1,n0mk0_circ*self.dim_c_ext[1] + n1mk1_circ] = dk[n0,n1]
-                        # lpos.append( (n0, n1, n0mk0_circ, n1mk1_circ) )
+                        
                         
             # negative second index            
             for k1 in range(self.wnd_size_c[1]-1):
                 dk = np.fft.ifft2(self.diags_fft_neg[:,:,k0,k1])
                 
-                # tr_diag = np.roll(np.roll(self.xt.conj(), k0, axis= 0), -(k1+1), axis = 1)
-                # tr_diag *= self.xt
-                
-                # i = 0
                 for n0 in range(self.dim_c_ext[0]):
                     n0mk0_circ = (n0 - k0) % self.dim_c_ext[0]
                     for n1 in range(self.dim_c_ext[1]):
                         n1mk1_circ = (n1 + k1+1) % self.dim_c_ext[1]
                         self.x_lifted_comp[n0mk0_circ*self.dim_c_ext[1] + n1mk1_circ,n0* self.dim_c_ext[1] + n1] = dk[n0,n1].conj()
                         self.x_lifted_comp[n0* self.dim_c_ext[1] + n1,n0mk0_circ*self.dim_c_ext[1] + n1mk1_circ] = dk[n0,n1]
-                        # lneg.append( (n0, n1, n0mk0_circ, n1mk1_circ) )
-        
-        # inter = [value for value in lpos if value in lneg]
-        # i = 0
+                        
         
     def construct_diags(self):
         self.diags = np.zeros( (self.dim_c_ext[0],self.dim_c_ext[1],2*self.wnd_size_c[0] - 1, 2 * self.wnd_size_c[1] - 1), dtype = complex )
@@ -869,7 +847,6 @@ class wdd:
             
             # with flexible diagonals
             
-            
             B_lam_ifft = np.fft.ifft2(B_lam)
             idx2 = np.abs(B_lam_ifft) > self.as_threshold
             
@@ -932,7 +909,6 @@ class wdd:
                 unused_diags[self.wnd_size_c[0]-1:, self.wnd_size_c[1]-1:] = used_diags
                 unused_diags[self.wnd_size_c[0]-1:, :self.wnd_size_c[1]-1] = np.flip(used_diags_neg,axis = 1)
                 unused_diags[:self.wnd_size_c[0], self.wnd_size_c[1]:] = np.flip(used_diags_neg,axis = 0)
-                # unused_diags = 1- unused_diags
                 
                 idx[:,:,unused_diags==0] = True
                 idx_0_tr[:,:,unused_diags==0] = False
@@ -1073,7 +1049,6 @@ class wdd:
     def run(self):
         self.compute_singular_values()
         self.construct_diagonals_fft()
-        # self.truncate_diag_fft()
         
         if self.subspace_completion:
             self.subspace_completion()

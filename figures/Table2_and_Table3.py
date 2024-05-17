@@ -3,40 +3,14 @@ import sys
 sys.path.insert(1, '..')
 import time
 from scipy.ndimage import zoom
-from skimage.color import rgb2hsv
-from matplotlib.colors import LinearSegmentedColormap
-colors = ["black", "lightgray", "black"]
-cmap = LinearSegmentedColormap.from_list("", colors)
 from PIL import Image
 
 import forward as forward
 import utility_2D as util
 
 import adp as adp
-
+import helper
 import wigner_2d as wdd
-
-### Helper functions ###
-
-def image_to_object(im,satur_parser):
-    im_hsv = rgb2hsv(im)
-       
-    modulus = im_hsv[:,:,2] * 255 
-    phase = (modulus - np.min(modulus)) / (np.max(modulus) - np.min(modulus)) * 2*np.pi - np.pi
-    
-    obj_mod = modulus * np.exp(1.0j * phase)  
-    
-    return obj_mod
-
-def image_to_phase_object(im,satur_parser):
-    im_hsv = rgb2hsv(im)
-       
-    modulus = im_hsv[:,:,2] * 255 
-    phase = (modulus - np.min(modulus)) / (np.max(modulus) - np.min(modulus)) * 2*np.pi - np.pi
-    
-    obj_mod =  np.exp(1.0j * phase)
-    
-    return obj_mod
 
 
 ## for Table 2: phase_object = 0
@@ -62,9 +36,9 @@ im[:,:,1] = zoom(im_cam[:,:],factor)
 im[:,:,2] = zoom(im_cam[:,:],factor)
 
 if phase_object == 1:
-    obj = image_to_phase_object(im,lambda x,v: x)
+    obj = helper.image_to_phase_object(im,lambda x,v: x)
 else:
-    obj = image_to_object(im,lambda x,v: x)
+    obj = helper.image_to_object(im,lambda x,v: x)
 
 ### Parameter Setup ###
 

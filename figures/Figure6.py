@@ -2,53 +2,18 @@ import numpy as np
 import sys
 sys.path.insert(1, '..')
 import time
-import cmath
 from scipy.ndimage import zoom
-from skimage.color import rgb2hsv
-import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
-colors = ["black", "lightgray", "black"]
-cmap = LinearSegmentedColormap.from_list("", colors)
 from PIL import Image
+
 
 import forward as forward
 import utility_2D as util
+import helper
 
 import wigner_2D as wdd
 
 import adp as adp
 
-### Helper functions ###
-
-def image_to_object(im,satur_parser):
-    im_hsv = rgb2hsv(im)
-       
-    modulus = im_hsv[:,:,2] * 255 
-    phase = (modulus - np.min(modulus)) / (np.max(modulus) - np.min(modulus)) * 2*np.pi - np.pi
-    
-    obj_mod = modulus * np.exp(1.0j * phase)
-    
-    return obj_mod
-
-def show_object(obj):
-    
-    fig, ax = plt.subplots(nrows = 1, ncols = 2)
-    
-    modulus = np.abs(obj)
-    phase = np.ones((obj.shape[0],obj.shape[1],3))
-    phase[:,:,0] = (np.angle(obj) + cmath.pi)/(2*cmath.pi) 
-    phase_rgb = phase[:,:,0] 
-    
-    phase_rgb =  (np.angle(obj) - np.min(np.angle(obj))) / (np.max(np.angle(obj) -  np.min(np.angle(obj)))) * 2*np.pi - np.pi
-
-    ax[0].imshow(modulus, cmap = 'gray', vmin = 0, vmax  = 2*65025 - 4000)
-    ax[0].axis('off')
-
-    ax[1].imshow(phase_rgb, cmap =  cmap, vmin = -np.pi, vmax = np.pi, interpolation="nearest") 
-    ax[1].axis('off')
-       
-    plt.show()
- 
 ### Load cameraman and transfrom it ###
 
 im_cam = Image.open("cameraman.tif")
@@ -61,9 +26,9 @@ im[:,:,0] = zoom(im_cam[:,:],factor)
 im[:,:,1] = zoom(im_cam[:,:],factor)
 im[:,:,2] = zoom(im_cam[:,:],factor)
 
-obj = image_to_object(im,lambda x,v: x)
+obj = helper.image_to_object(im,lambda x,v: x)
 
-show_object(obj)
+helper.show_object(obj)
 
 ### Parameter Setup ###
 
@@ -133,7 +98,7 @@ obj_r = wigner.run()
 end_time = time.time()
 
 obj_r = util.align_objects(obj,obj_r,par.mask)
-show_object(obj_r)
+helper.show_object(obj_r)
 
 print('Time: ', end_time - start_time)
 f_r = par.forward_2D_pty(obj_r)
@@ -181,7 +146,7 @@ obj_r = wignerb.run()
 end_time = time.time()
 
 obj_r = util.align_objects(obj,obj_r,par.mask)
-show_object(obj_r)
+helper.show_object(obj_r)
 
 print('Time: ', end_time - start_time)
 f_r = par.forward_2D_pty(obj_r)
@@ -220,7 +185,7 @@ end_time = time.time()
 print('Time: ', end_time - start_time)
 obj_r_adp = obj_r_adp[0:d,0:d]
 obj_r_adp = util.align_objects(obj,obj_r_adp,par.mask)
-show_object(obj_r_adp)
+helper.show_object(obj_r_adp)
 print( 'Relative error: ', util.relative_error(obj,obj_r_adp,par.mask) )
 f_r = par.forward_2D_pty(obj_r_adp)
 b_r = par.forward_to_meas_2D_pty(f_r)
@@ -233,7 +198,7 @@ end_time = time.time()
 print('Time: ', end_time - start_time)
 obj_r_adp = obj_r_adp[0:d,0:d]
 obj_r_adp = util.align_objects(obj,obj_r_adp,par.mask)
-show_object(obj_r_adp)
+helper.show_object(obj_r_adp)
 print( 'Relative error: ', util.relative_error(obj,obj_r_adp,par.mask) )
 f_r = par.forward_2D_pty(obj_r_adp)
 b_r = par.forward_to_meas_2D_pty(f_r)

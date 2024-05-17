@@ -2,61 +2,17 @@ import numpy as np
 import sys
 sys.path.insert(1, '..')
 import time
-import cmath
+
 from scipy.ndimage import zoom
-from skimage.color import rgb2hsv
-import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
-colors = ["black", "lightgray", "black"]
-cmap = LinearSegmentedColormap.from_list("", colors)
 from PIL import Image
 
+import helper
 import utility_2D as util
 import forward as forward
 import preprocessing as preprocessing
 
 import wigner_2D as wdd
 
-### Helper functions ###
-
-def image_to_phase_object(im,satur_parser):
-    im_hsv = rgb2hsv(im)
-       
-    modulus = im_hsv[:,:,2] * 255 
-    phase = (modulus - np.min(modulus)) / (np.max(modulus) - np.min(modulus)) * 2*np.pi - np.pi
-        
-    # phase object    
-    obj_mod =  np.exp(1.0j * phase)
-    
-    return obj_mod
-
-def show_object(obj):
-    
-    fig, ax = plt.subplots(nrows = 1, ncols = 1)
-    
-    modulus = np.abs(obj)
-
-    phase = np.ones((obj.shape[0],obj.shape[1],3))
-    phase[:,:,0] = (np.angle(obj) + cmath.pi)/(2*cmath.pi) 
-    phase_rgb = phase[:,:,0] 
-    
-    phase_rgb =  (np.angle(obj) - np.min(np.angle(obj))) / (np.max(np.angle(obj) -  np.min(np.angle(obj)))) * 2*np.pi - np.pi
-    
-    ax.imshow(phase_rgb,cmap =  cmap, vmin = -np.pi, vmax = np.pi, interpolation="nearest") 
-    ax.axis('off')
-       
-    plt.show()  
-    
-def show_diffpat(obj):
-    
-    fig, ax = plt.subplots(nrows = 1, ncols = 1)
-    obj = np.log10(obj)
-                
-    ax.imshow(obj,cmap = cmap)
-    ax.axis('off')
-            
-    plt.show()
-    
 
 ### Load cameraman and transfrom it ###
 
@@ -70,9 +26,9 @@ im[:,:,0] = zoom(im_cam[:,:],factor)
 im[:,:,1] = zoom(im_cam[:,:],factor)
 im[:,:,2] = zoom(im_cam[:,:],factor)
 
-obj = image_to_phase_object(im,lambda x,v: x)
+obj = helper.image_to_phase_object(im,lambda x,v: x)
 
-show_object(obj)
+helper.show_phase_object(obj)
 
 ### Parameter Setup ###
 
@@ -101,7 +57,7 @@ if (np.mod(d,2) == 0):
 else:
     window = window *np.exp(2j*r1) 
 
-show_object(window)
+helper.show_object(window)
            
 ### Prepare ptycho object and generate the forward measurements ###   
 
@@ -121,7 +77,7 @@ f = par.forward_2D_pty(obj)
 print('Computing measurements')
 b = par.forward_to_meas_2D_pty(f)
 
-show_diffpat(b[:,:,0])
+helper.show_diffpat(b[:,:,0])
 
 
 ### Background ###
@@ -140,7 +96,7 @@ scaling = 17 # higher distortion level
 #scaling = 2 # lower distortion level
 b_n = b +  scaling*background 
 
-show_diffpat(b_n[:,:,0])
+helper.show_diffpat(b_n[:,:,0])
 
 print('Noise level: ', util.relative_measurement_error(b,b_n))
 
@@ -171,7 +127,7 @@ end_time = time.time()
 
 
 obj_r = util.align_objects(obj,obj_r,par.mask)
-show_object(obj_r)
+helper.show_phase_object(obj_r)
 
 print('Time: ', end_time - start_time)
 
@@ -220,7 +176,7 @@ end_time = time.time()
 
 
 obj_r = util.align_objects(obj,obj_r,par.mask)
-show_object(obj_r)
+helper.show_phase_object(obj_r)
 
 print('Time: ', end_time - start_time)
 
@@ -269,7 +225,7 @@ end_time = time.time()
 
 
 obj_r = util.align_objects(obj,obj_r,par.mask)
-show_object(obj_r)
+helper.show_phase_object(obj_r)
 
 print('Time: ', end_time - start_time)
 
@@ -309,7 +265,7 @@ end_time = time.time()
 
 
 obj_r = util.align_objects(obj,obj_r,par.mask)
-show_object(obj_r)
+helper.show_phase_object(obj_r)
 
 print('Time: ', end_time - start_time)
 
