@@ -5,8 +5,6 @@ import time
 
 import forward as forward
 
-import wigner_with_background_removal as wdd_background
-
 import wigner_2D as wdd
 
 import preprocessing as preprocessing
@@ -240,7 +238,7 @@ print( 'Relative measurement error: ', util.relative_measurement_error(b,b_r))
 ### Proposed method ###
 
 
-wignerb = wdd_background.wdd_background(b_n,
+wignerb = wdd.wdd(b_n,
                   ptycho = par,
                   gamma = delta,
                   reg_type = 'percent',
@@ -253,7 +251,8 @@ wignerb = wdd_background.wdd_background(b_n,
                   add_dummy = False,
                   subspace_completion = False,
                   sbc_threshold = 0.0,
-                  memory_saving = False)
+                  memory_saving = False,
+                  background = 'general')
 
 
 print('Reconstructing...')
@@ -279,7 +278,7 @@ print( 'Relative measurement error: ', util.relative_measurement_error(b,b_r))
 ###
 
 
-wignerb = wdd_background.wdd_background(b_n,
+wignerb = wdd.wdd(b_n,
                   ptycho = par,
                   gamma = 3,
                   reg_type = 'percent',
@@ -292,7 +291,8 @@ wignerb = wdd_background.wdd_background(b_n,
                   add_dummy = False,
                   subspace_completion = False,
                   sbc_threshold = 0.0,
-                  memory_saving = False)
+                  memory_saving = False,
+                  background = 'general')
 
 
 print('Reconstructing...')

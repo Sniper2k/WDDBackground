@@ -1,25 +1,14 @@
 import numpy as np
-# from scipy.sparse.linalg import eigsh
-
-import sys
-sys.path.insert(1, '../model')
-import forward as forward
-# import utility_2D as util
-
-# from recordtype import recordtype
 import copy
-
 from scipy.sparse.linalg import eigsh
+from scipy import linalg
 
-# def wdd_params_object():
-    # return recordtype("wdd_params", "ptycho_params, shift_size, as_wtype, as_threshold, reg_threshold, mg_type,mg_factor, circ_shifts, add_dummy, subspace_completion, sbc_threshold")
-
+import forward as forward
 
 class wdd:
     def __init__(self, 
                  measurements, 
                  **kwargs
-                 # wddpar
                  ):
         self.b = measurements
         
@@ -180,6 +169,21 @@ class wdd:
         else:
             self.as_threshold = 10**-10
             
+        ##### BACKGROUND PARAMETERS ####
+        
+        if 'background' in kwargs.keys():
+            if not isinstance(kwargs['background'], str):
+                print('background is given, but not a string. Set to none')
+                self.background = 'none'
+                
+            if kwargs['background'] in ['none','general','phase']:
+                self.background = kwargs['background']
+            else:
+                print('background may take on of the values: none, general or phase. Set to none.')
+                self.background = 'none'
+        else:
+            self.background = 'none'
+            
         ##### OTHER PARAMETERS ######
         
         if 'add_dummy' in kwargs.keys():
@@ -305,15 +309,16 @@ class wdd:
         self.diags_fft_neg = np.zeros( (self.dim_c_ext[0], self.dim_c_ext[1],self.wnd_size_c[0],self.wnd_size_c[1]-1), dtype = complex) 
         
         # add dummy measurements
-        x_dummy = np.ones(self.par.window_shape,dtype=complex)
-        x_dummy = x_dummy / np.linalg.norm(x_dummy,'fro') * np.sqrt(np.sum(self.b)) / np.linalg.norm(self.par.window,'fro')
-        forw_dummy = self.par.forward_2D_os(x_dummy)
-        diff_pat_dummy = np.abs(forw_dummy)**2
-        diff_pat_dummy = np.roll(diff_pat_dummy, -h2, axis=1)    
-        diff_pat_dummy = np.roll(diff_pat_dummy, -h1, axis=0)
-        diff_pat_ifft_dummy = np.fft.ifft2(diff_pat_dummy)
+        # x_dummy = np.ones(self.par.window_shape,dtype=complex)
+        # x_dummy = x_dummy / np.linalg.norm(x_dummy,'fro') * np.sqrt(np.sum(self.b)) / np.linalg.norm(self.par.window,'fro')
+        # forw_dummy = self.par.forward_2D_os(x_dummy)
+        # diff_pat_dummy = np.abs(forw_dummy)**2
+        # diff_pat_dummy = np.roll(diff_pat_dummy, -h2, axis=1)    
+        # diff_pat_dummy = np.roll(diff_pat_dummy, -h1, axis=0)
+        # diff_pat_ifft_dummy = np.fft.ifft2(diff_pat_dummy)
         
-        diff_pat_ifft_dummy[:,:] = 0.0
+        diff_pat_ifft_dummy = np.zeros(self.par.fourier_dimension, dtype = complex)
+        # diff_pat_ifft_dummy[:,:] = 0.0
         
         # number of given scan positions
         if (self.par.circular == False):
@@ -376,6 +381,336 @@ class wdd:
         
         
         # above_threshold_idx = np.abs(self.singular_values) > self.reg_param
+        self.diags_fft[~self.above_threshold] = 0
+        self.diags_fft_neg[~self.above_threshold_neg] = 0
+        
+    def background_general_coefficient_recovery(self):
+        print('Background coefficient recovery...')
+        
+        # Discard zeroth frequencies (contain background information)
+        self.diags_fft[0,0,:,:] = 0
+        self.diags_fft_neg[0,0,:,:] = 0
+        
+        # Reconstruct zeroth frequencies
+        
+        count = 0
+        size_lin_syst = 2
+        
+        for k0 in range(self.gamma):
+
+            if self.gamma == self.wnd_size_c[1]:
+                gamma2 = self.wnd_size_c[1]
+            else:
+                gamma2 = self.gamma - k0  
+                
+            for k1 in range(gamma2):
+                
+                count += 1
+                
+                A = np.zeros(((size_lin_syst ** 2),2),dtype = 'complex')
+                y = np.zeros((size_lin_syst ** 2,1),dtype = 'complex')
+                
+                for s0 in range(size_lin_syst):
+                    for s1 in range(size_lin_syst):
+                        
+                        if (s0 + s1 > 0):
+                                  
+                            K_j_l =  0
+                            for j0 in range(self.dim_c_ext[0]):
+                                for j1 in range(self.dim_c_ext[1]):
+                                        K_j_l +=  self.diags_fft[j0,j1,k0,k1] * np.conj(self.diags_fft[np.mod(j0 - s0,self.dim_c_ext[0]) ,np.mod(j1 - s1,self.dim_c_ext[1]),k0,k1])                                        
+                                        mod_fact = np.exp(2j * np.pi * ((j0-s0) * k0 / self.dim_c_ext[0] +  (j1-s1) * k1 / self.dim_c_ext[1]))                
+                                        K_j_l += - mod_fact * self.diags_fft[j0,j1,0,0] * np.conj(self.diags_fft[np.mod(j0 - s0,self.dim_c_ext[0]) ,np.mod(j1 - s1,self.dim_c_ext[1]),0,0])                                                                              
+                            
+                            z = (np.exp( - 2j * np.pi * (s0 * k0 / self.dim_c_ext[0] +  s1 * k1 / self.dim_c_ext[1])) + 1) * self.diags_fft[s0,s1,0,0]
+                            
+                            y[(s0) * size_lin_syst + (s1)] =  - np.imag( K_j_l * np.conj(z) )
+                          
+                            a1 = np.imag(self.diags_fft[s0,s1,k0,k1] * np.conj(z)) - np.imag(self.diags_fft[np.mod(- s0,self.dim_c_ext[0]), np.mod(- s1,self.dim_c_ext[1]),k0,k1] * z)
+                            a2 = - np.real(self.diags_fft[s0,s1,k0,k1] * np.conj(z)) + np.real(self.diags_fft[np.mod(- s0,self.dim_c_ext[0]), np.mod(- s1,self.dim_c_ext[1]),k0,k1] * z)
+                                                    
+                            A[(s0) * size_lin_syst + (s1),:] = [a1,a2]
+                
+      
+                x = linalg.lstsq(A[1:,:], y[1:])
+                x = x[0]
+                self.diags_fft[0,0,k0,k1] =  x[0] + 1.0j * x[1] #0
+        
+        
+            # negative second index
+            for k1 in range(gamma2 - 1):
+                     
+                A = np.zeros(((size_lin_syst ** 2),2),dtype = 'complex')
+                y = np.zeros((size_lin_syst ** 2,1),dtype = 'complex')
+ 
+                
+                for s0 in range(size_lin_syst):
+                    for s1 in range(size_lin_syst):
+                        
+                         if (s0 + s1 > 0):
+                            
+                            K_j_l =  0
+                        
+                            for j0 in range(self.dim_c_ext[0]):
+                                for j1 in range(self.dim_c_ext[1]):                                                                          
+                                        K_j_l += self.diags_fft_neg[j0,j1,k0,k1] * np.conj(self.diags_fft_neg[np.mod(j0 - s0,self.dim_c_ext[0]) , np.mod(j1 - s1,self.dim_c_ext[1]),k0,k1])                                     
+                                        mod_fact = np.exp(2j * np.pi * ((j0-s0) * k0 / self.dim_c_ext[0] -  (j1-s1) * (k1+1) / self.dim_c_ext[1]))              
+                                        K_j_l += - mod_fact * self.diags_fft[j0,j1,0,0] * np.conj(self.diags_fft[np.mod(j0 - s0,self.dim_c_ext[0]) , np.mod(j1 - s1,self.dim_c_ext[1]),0,0])   
+                            
+                            z = (np.exp( - 2j * np.pi * (s0 * k0 / self.dim_c_ext[0] -  s1 * (k1+1) / self.dim_c_ext[1])) + 1) * self.diags_fft[s0,s1,0,0]
+                            
+                            y[(s0) * size_lin_syst + (s1)] = - np.imag( K_j_l * np.conj(z) )
+
+                            a1 = np.imag(self.diags_fft_neg[s0,s1,k0,k1] * np.conj(z)) - np.imag(self.diags_fft_neg[np.mod(- s0,self.dim_c_ext[0]) ,np.mod(- s1,self.dim_c_ext[1]),k0,k1] * z)
+                            a2 = - np.real(self.diags_fft_neg[s0,s1,k0,k1] * np.conj(z)) + np.real(self.diags_fft_neg[np.mod(- s0,self.dim_c_ext[0]) ,np.mod(- s1,self.dim_c_ext[1]),k0,k1] * z)
+                                                    
+                            A[(s0) * size_lin_syst + (s1),:] = [a1,a2]
+          
+                x = linalg.lstsq(A[1:,:], y[1:])
+                x = x[0]
+                
+                self.diags_fft_neg[0,0,k0,k1] =  x[0] + 1.0j * x[1] 
+        
+        # Reconstruct f_0^0
+        
+        c_0 = np.zeros((self.wnd_size_c[0],self.wnd_size_c[1]), dtype = 'complex')
+     
+        for k0 in range(self.gamma):
+            
+            if self.gamma == self.wnd_size_c[1]:
+                gamma2 = self.wnd_size_c[1]
+            else:
+                gamma2 = self.gamma - k0
+            
+            for k1 in range(gamma2):        
+                
+                K_j_l =  0
+                    
+                for j0 in range(self.dim_c_ext[0]):
+                    for j1 in range(self.dim_c_ext[1]):
+                        
+                        if (j0 + j1 > 0):   
+                            K_j_l += self.diags_fft[j0,j1,k0,k1] * np.conj(self.diags_fft[j0,j1,k0,k1])
+                            mod_fact = np.exp(2j * np.pi * (j0 * k0 / self.dim_c_ext[0] +  j1 * k1 / self.dim_c_ext[1]))
+                            K_j_l += - mod_fact * self.diags_fft[j0,j1,0,0] * np.conj(self.diags_fft[j0,j1,0,0])
+                                  
+                c_0[k0,k1] = K_j_l
+                
+                
+        c_0[0,0] = 0        
+        self.diags_fft[0,0,0,0] = 1 / (count - 1) * np.sum( np.sqrt(c_0 + np.abs(self.diags_fft[0,0,:,:])**2) )   
+
+        
+        self.diags_fft[~self.above_threshold] = 0
+        self.diags_fft_neg[~self.above_threshold_neg] = 0
+        
+    def background_phase_coefficient_recovery(self): 
+        print('Background coefficient recovery...')
+        
+        diags_w_background = self.diags_fft[0,0,:,:] * 1
+        diags_w_background_neg = self.diags_fft_neg[0,0,:,:] * 1
+        
+        # Discard zeroth frequencies (contain background information)
+        self.diags_fft[0,0,:,:] = 0
+        self.diags_fft_neg[0,0,:,:] = 0
+        
+        
+        # Reconstruction of the zeroth frequencies
+        
+        d = self.dim_c_ext[0] * self.dim_c_ext[1]
+        self.diags_fft[0,0,0,0] = d
+        
+        for k0 in range(self.gamma):
+            
+            if self.gamma == self.wnd_size_c[0]:
+                gamma2 = self.wnd_size_c[1]
+            else:
+                gamma2 = self.gamma - k0
+                  
+            for k1 in range(gamma2):
+                
+                if k0 + k1 > 0:
+                
+                    sum_diags = 0
+                    for j0 in range(self.dim_c_ext[0]):
+                        for j1 in range(self.dim_c_ext[1]):
+                                sum_diags += np.abs(self.diags_fft[j0,j1,k0,k1])**2
+                   
+                    f0_abs =  np.sqrt(np.max([d**2 - sum_diags,10**(-8)]))
+ 
+                    a0 = 0
+                    for j0 in range(self.dim_c_ext[0]):
+                        for j1 in range(self.dim_c_ext[1]):
+                                a0 += np.exp(2j * np.pi * (j0*0/self.dim_c_ext[0] + j1*1/self.dim_c_ext[1])) * self.diags_fft[j0,j1,k0,k1]
+                    a0_1 = a0 * 1                
+                    
+                    if a0 == 0:
+                        f = diags_w_background[k0,k1]
+                    else:    
+                        frac = (d**2 - np.abs(a0)**2 - f0_abs**2) / (2*np.abs(a0)*f0_abs) 
+                        
+                        if frac > 1:
+                            frac = 1
+                        if frac < -1:
+                            frac = -1
+                            
+                        y11 = np.angle(a0) + np.arccos(frac)
+                        y12 = np.angle(a0) - np.arccos(frac)
+                        
+                        a0 = 0
+                        for j0 in range(self.dim_c_ext[0]):
+                            for j1 in range(self.dim_c_ext[1]):
+                                    a0 += np.exp(2j*np.pi*(j0*0/self.dim_c_ext[0] + j1*2/self.dim_c_ext[1])) * self.diags_fft[j0,j1,k0,k1]
+                        
+                        delta0 = 0
+                        delta1 = 0
+                        while np.abs(a0 - a0_1) < 10**(-8) and delta0 < self.dim_c_ext[0]:
+                            if delta0 == 0:
+                                delta1 = 3
+                            while np.abs(a0 - a0_1) < 10**(-8) and delta1 < self.dim_c_ext[1]:
+                                a0 = 0
+                                for j0 in range(self.dim_c_ext[0]):
+                                    for j1 in range(self.dim_c_ext[1]):
+                                            a0 += np.exp(2j*np.pi*(j0* delta0/self.dim_c_ext[0] + j1* delta1/self.dim_c_ext[1])) * self.diags_fft[j0,j1,k0,k1]
+                                delta1 += 1                
+                            delta0 += 1   
+                        
+                        
+                        frac = (d**2 - np.abs(a0)**2 - f0_abs**2)/(2*np.abs(a0)*f0_abs) 
+                        
+                        if frac > 1:
+                            frac = 1
+                        if frac < -1:
+                            frac = -1
+                            
+                        y21 = np.angle(a0) + np.arccos(frac)
+                        y22 = np.angle(a0) - np.arccos(frac)
+                           
+                        f_choose = np.array([np.abs(y11-y21),np.abs(y11-y22),np.abs(y12-y21),np.abs(y12-y22)])
+    
+                        if np.min(f_choose) > 10**(-5):                            
+                            a0 = 0
+                            for j0 in range(self.dim_c_ext[0]):
+                                for j1 in range(self.dim_c_ext[1]):
+                                        a0 += np.exp(2j*np.pi*(j0*(delta0 + 1)/self.dim_c_ext[0] + j1*(delta1 + 1)/self.dim_c_ext[1])) * self.diags_fft[j0,j1,k0,k1]
+                            
+                            frac = (d**2 - np.abs(a0)**2 - f0_abs**2)/(2*np.abs(a0)*f0_abs) 
+                            
+                            if frac > 1:
+                                frac = 1
+                            if frac < -1:
+                                frac = -1
+                                
+                            y21 = np.angle(a0) + np.arccos(frac)
+                            y22 = np.angle(a0) - np.arccos(frac)
+                            
+                            f_choose = np.array([np.abs(y11-y21),np.abs(y11-y22),np.abs(y12-y21),np.abs(y12-y22)]) 
+                            
+                        if(np.abs(y11-y21) == np.min(f_choose)):
+                            f = f0_abs * np.exp(1j * y11)
+                        elif (np.abs(y11-y22)  == np.min(f_choose)):
+                            f = f0_abs * np.exp(1j * y11)
+                        elif (np.abs(y12-y21)  == np.min(f_choose)): 
+                            f = f0_abs * np.exp(1j * y12)
+                        elif (np.abs(y12-y22)  == np.min(f_choose)):
+                            f = f0_abs * np.exp(1j * y12)
+                        else:
+                            f = (f0_abs * np.exp(1j * y11) + f0_abs * np.exp(1j * y12))/2
+                        
+                    self.diags_fft[0,0,k0,k1] = f    
+                
+            for k1 in range(gamma2 - 1):
+                 
+                sum_diags = 0
+                for j0 in range(self.dim_c_ext[0]):
+                    for j1 in range(self.dim_c_ext[1]):
+                            sum_diags += np.abs(self.diags_fft_neg[j0,j1,k0,k1])**2
+
+                f0_abs = np.sqrt(np.max([d**2 - sum_diags,10**(-8)]))
+                
+                a0 = 0
+                for j0 in range(self.dim_c_ext[0]):
+                    for j1 in range(self.dim_c_ext[1]):
+                            a0 += np.exp(2j * np.pi * (j0*0/self.dim_c_ext[0] + j1*1/self.dim_c_ext[1])) * self.diags_fft_neg[j0,j1,k0,k1] 
+                a0_1 = a0 * 1
+                
+                if a0 == 0:
+                    f = diags_w_background_neg[k0,k1]
+                else:
+                    frac = (d**2 - np.abs(a0)**2 - f0_abs**2) / (2 * np.abs(a0) * f0_abs) 
+                    
+                    if frac > 1:
+                        frac = 1
+                    if frac < -1:
+                        frac = -1
+                        
+                    y11 = np.angle(a0) + np.arccos(frac)
+                    y12 = np.angle(a0) - np.arccos(frac)
+                        
+                    a0 = 0
+                    for j0 in range(self.dim_c_ext[0]):
+                        for j1 in range(self.dim_c_ext[1]):
+                                a0 += np.exp(2j*np.pi*(j0*1/self.dim_c_ext[0] + j1*0/self.dim_c_ext[1])) * self.diags_fft_neg[j0,j1,k0,k1]
+                    
+                    delta0 = 0
+                    delta1 = 0
+                    while np.abs(a0 - a0_1) < 10**(-8) and delta0 < self.dim_c_ext[0]:
+                        if delta0 == 0:
+                            delta1 = 3
+                        while np.abs(a0 - a0_1) < 10**(-8) and delta1 < self.dim_c_ext[1]:
+                            a0 = 0
+                            for j0 in range(self.dim_c_ext[0]):
+                                for j1 in range(self.dim_c_ext[1]):
+                                        a0 += np.exp(2j*np.pi*(j0* delta0/self.dim_c_ext[0] + j1* delta1/self.dim_c_ext[1])) * self.diags_fft_neg[j0,j1,k0,k1]
+                            delta1 += 1                
+                        delta0 += 1   
+                           
+                    frac = (d**2 - np.abs(a0)**2 - f0_abs**2) / (2 * np.abs(a0) * f0_abs) 
+                    
+                    if frac > 1:
+                        frac = 1
+                    if frac < -1:
+                        frac = -1
+                        
+                    y21 = np.angle(a0) + np.arccos(frac)
+                    y22 = np.angle(a0) - np.arccos(frac)
+                    
+                    f_choose = np.array([np.abs(y11-y21),np.abs(y11-y22),np.abs(y12-y21),np.abs(y12-y22)])
+                    if np.min(f_choose) > 10**(-5):
+                        a0 = 0
+                        for j0 in range(self.dim_c_ext[0]):
+                            for j1 in range(self.dim_c_ext[1]):
+                                    a0 += np.exp(2j*np.pi*(j0*(delta0+1)/self.dim_c_ext[0] + j1*(delta1+1)/self.dim_c_ext[1])) * self.diags_fft_neg[j0,j1,k0,k1]
+                    
+                        frac = (d**2 - np.abs(a0)**2 - f0_abs**2) / (2 * np.abs(a0) * f0_abs) 
+       
+                        if frac > 1:
+                            frac = 1
+                        if frac < -1:
+                            frac = -1
+                            
+                        y21 = np.angle(a0) + np.arccos(frac)
+                        y22 = np.angle(a0) - np.arccos(frac)
+            
+                        f_choose = np.array([np.abs(y11-y21),np.abs(y11-y22),np.abs(y12-y21),np.abs(y12-y22)]) 
+   
+                    if(np.abs(y11-y21) == np.min(f_choose)):
+                        f = f0_abs * np.exp(1j * y11)
+                    elif (np.abs(y11-y22)  == np.min(f_choose)):
+                        f = f0_abs * np.exp(1j * y11)
+                    elif (np.abs(y12-y21)  == np.min(f_choose)): 
+                        f = f0_abs * np.exp(1j * y12)
+                    elif (np.abs(y12-y22)  == np.min(f_choose)):
+                        f = f0_abs * np.exp(1j * y12)
+                    else:
+                        f = (f0_abs * np.exp(1j * y11) + f0_abs * np.exp(1j * y12))/2
+
+                self.diags_fft_neg[0,0,k0,k1] = f             
+        
+        
+        self.diags_fft[0,0,0,0] = d        
+        
+        
         self.diags_fft[~self.above_threshold] = 0
         self.diags_fft_neg[~self.above_threshold_neg] = 0
         
@@ -453,24 +788,9 @@ class wdd:
         self.diags[:,:,(self.wnd_size_c[0]-1):, :(self.wnd_size_c[1]-1)] =  diags_neg
     
     def multiply_via_diag(self, matrix, vector):
-        # vector = np.roll(np.roll(vector, self.wnd_size_c[0]-1, axis = 0), self.wnd_size_c[1]-1, axis = 1)
         prod = np.zeros(self.dim_c_ext, dtype = complex )
-        # prod1 = np.zeros_like(prod)
         dd0m1 = 2*self.wnd_size_c[0] - 1
         dd1m1 = 2*self.wnd_size_c[1] - 1
-        
-        # for n0 in range(self.dim_c_ext[0]):
-        #     #suboptimal
-        #     vec = np.roll(vector, -n0, axis = 0)[:dd0m1,:] 
-        #     for n1 in range(self.dim_c_ext[1]):
-        #         vec_supp = np.roll(vec,-n1, axis =1)[:,:dd1m1]
-        #         prod[n0,n1] = np.sum(matrix[n0,n1,:,:] * vec_supp, axis = None)
-                
-                # # if n0==0 and n1 == 0:
-                # #     for k0 in range(2*self.wnd_size_c[0]-1):
-                # #         for k1 in range(2*self.wnd_size_c[1] - 1):
-                # #             print(matrix[n0,n1,k0,k1]*vec_supp[k0,k1] , vec_supp[k0,k1])
-        
         
         for k0 in range(dd0m1):
             vector_t0 = np.roll(vector, -k0 + self.wnd_size_c[0]-1, axis = 0)
@@ -487,9 +807,9 @@ class wdd:
             self.x_mag = np.sqrt(np.abs(np.diag(self.x_lifted_comp)))
         elif self.mg_type == 'block_mag':
             # TBD
-            t=0
+            print('Not implemented. Please, use diag or log instead. Used diag')
+            self.x_mag = np.sqrt(np.abs(np.diag(self.x_lifted_comp)))
         elif self.mg_type == 'log':
-            # idx = np.abs(self.x_lifted_comp) > self.as_threshold
             idx_0 = np.abs(self.x_lifted_comp) > 0
             idx = np.abs(self.x_lifted_comp) <= self.as_threshold
             idx_0_tr = idx_0 & idx
@@ -497,12 +817,10 @@ class wdd:
             # select used diagonals 
             used_diags = np.ones(self.wnd_size_c)
             used_diags_neg = np.ones( (self.wnd_size_c[0],self.wnd_size_c[1]-1) )
-            # if self.mg_diagonals_type == 'all':
-                # gamma = self.wnd_size_c
             if self.mg_diagonals_type == 'value':
                 gamma0 = np.maximum(self.mg_diagonals_param[0] // self.par.shift[0],1)
                 gamma1 = np.maximum(self.mg_diagonals_param[1] // self.par.shift[1],1)
-                # gamma = (gamma0,gamma1)
+
                 used_diags[gamma0:,:] = 0
                 used_diags[:,gamma1:] = 0
                 used_diags_neg[gamma0:,:] = 0
@@ -539,22 +857,7 @@ class wdd:
                 dist = np.zeros( (2, np.prod(self.dim_c_ext), np.prod(self.dim_c_ext)),dtype= int)
                 dist[0,:,:] = np.repeat(np.repeat(dist_x,self.dim_c_ext[1],axis = 0),self.dim_c_ext[1],axis = 1)
                 dist[1,:,:] = np.tile(dist_y,(self.dim_c_ext[0],self.dim_c_ext[0]))
-                
-                # dist_flat = dist[0,:,:]*self.dim_c_ext[1] + dist[1,:,:]
-                
-                # dist[0,:,:] = (gx - gy + np.prod(self.dim_c_ext)) // self.dim_c_ext[0]
-                # dist[1,:,:] = (gx - gy + np.prod(self.dim_c_ext)) % self.dim_c_ext[0]
-                # dist = np.maximum( , )
-                # np.max.outer( dist_x,dist_y)
-                # dist = np.swapaxes(dist,1,2)
-                
-                # dist = np.einsum('ij,kl->ikjl', dist_x,dist_y)
-                # dist = np.reshape(dist,(np.prod(self.dim_c_ext),self.dim_c_ext[0],self.dim_c_ext[1]))
-                # dist = np.reshape(dist,(np.prod(self.dim_c_ext),np.prod(self.dim_c_ext)))
-                # B_lam_flat = B_lam.flatten()
-                
-                # idx_gamma = np.take_along_axis(B_lam,dist[0,:,:],axis = 0)
-                # idx_gamma = B_lam_flat[dist_flat]
+            
                 idx_gamma = B_lam[dist[0,:,:],dist[1,:,:]] == 0
                 idx_0_tr = idx_0_tr & ~idx_gamma
                 idx = idx | idx_gamma
@@ -562,29 +865,7 @@ class wdd:
             Ab = np.zeros_like(self.x_lifted_comp)
             Ab[~idx] = np.log(np.abs(self.x_lifted_comp[~idx]))
             Ab[idx_0_tr] = self.as_threshold
-            Btm = np.sum(Ab,axis=1) + np.diag(Ab)
-            # Btb =idx + np.diag( 2 + np.sum(idx,axis = 1))
-            # log_mag = np.linalg.lstsq(Btb, Btm, rcond = wddpar.as_threshold)
-            # Btb = Btb.astype(float)
-            
-            # B_lam to be fixed when all diagonals are used
-            
-            # only positive
-            # B_lam = np.zeros(self.dim_c_ext)
-            # B_lam[:self.wnd_size_c[0],:self.wnd_size_c[1]] = 1
-            # B_lam[(self.dim_c_ext[0]-self.wnd_size_c[0]+1):,(self.dim_c_ext[1]-self.wnd_size_c[1]+1):] = 1
-            # B_lam[0,(self.dim_c_ext[1]-self.wnd_size_c[1]+1):] = 1
-            # B_lam[(self.dim_c_ext[0]-self.wnd_size_c[0]+1):,0] = 1
-            # B_lam[0,0] = 2*np.prod(self.wnd_size_c) + 2
-            
-            # with negative
-            
-            # B_lam = np.zeros(self.dim_c_ext)
-            # B_lam[:self.wnd_size_c[0],:self.wnd_size_c[1]] = 1
-            # B_lam[(self.dim_c_ext[0]-self.wnd_size_c[0]+1):,(self.dim_c_ext[1]-self.wnd_size_c[1]+1):] = 1
-            # B_lam[:self.wnd_size_c[0],(self.dim_c_ext[1]-self.wnd_size_c[1]+1):] = 1
-            # B_lam[(self.dim_c_ext[0]-self.wnd_size_c[0]+1):,:self.wnd_size_c[1]] = 1
-            # B_lam[0,0] = (2*self.wnd_size_c[0]-1)*(2*self.wnd_size_c[1]-1) + 3
+            Btm = np.sum(Ab,axis=1) + np.diag(Ab)     
             
             # with flexible diagonals
             
@@ -608,11 +889,9 @@ class wdd:
             self.x_mag = np.sqrt(np.abs(self.diags[:,:,self.wnd_size_c[0]-1,self.wnd_size_c[1]-1]))
         elif self.mg_type == 'block_mag':
             # TBD
-            t=0
+            print('Not implemented. Please, use diag or log instead. Used diag')
+            self.x_mag = np.sqrt(np.abs(np.diag(self.x_lifted_comp)))
         elif self.mg_type == 'log':
-            
-            # idx = np.abs(self.diags) > self.as_threshold
-            
             idx_0 = np.abs(self.diags) > 0
             idx = np.abs(self.diags) <= self.as_threshold
             idx_0_tr = idx_0 & idx
@@ -663,26 +942,6 @@ class wdd:
             Ab[~idx] = np.log(np.abs(self.diags[~idx]))
             Ab[idx_0_tr] = self.as_threshold
             Btm = np.sum(Ab,axis=(2,3)) + Ab[:,:,self.wnd_size_c[0]-1,self.wnd_size_c[1]-1]
-            
-            # B_lam to be fixed when all diagonals are used
-            
-            # only positive
-            # B_lam = np.zeros(self.dim_c_ext)
-            # B_lam[:self.wnd_size_c[0],:self.wnd_size_c[1]] = 1
-            # B_lam[(self.dim_c_ext[0]-self.wnd_size_c[0]+1):,(self.dim_c_ext[1]-self.wnd_size_c[1]+1):] = 1
-            # B_lam[0,(self.dim_c_ext[1]-self.wnd_size_c[1]+1):] = 1
-            # B_lam[(self.dim_c_ext[0]-self.wnd_size_c[0]+1):,0] = 1
-            # B_lam[0,0] = 2*np.prod(self.wnd_size_c) + 2
-            
-            # with negative
-            
-            # B_lam = np.zeros(self.dim_c_ext)
-            # B_lam[:self.wnd_size_c[0],:self.wnd_size_c[1]] = 1
-            # B_lam[(self.dim_c_ext[0]-self.wnd_size_c[0]+1):,(self.dim_c_ext[1]-self.wnd_size_c[1]+1):] = 1
-            # B_lam[:self.wnd_size_c[0],(self.dim_c_ext[1]-self.wnd_size_c[1]+1):] = 1
-            # B_lam[(self.dim_c_ext[0]-self.wnd_size_c[0]+1):,:self.wnd_size_c[1]] = 1
-            # B_lam[0,0] = (2*self.wnd_size_c[0]-1)*(2*self.wnd_size_c[1]-1) + 3
-            
             
             B_lam_ifft = np.fft.ifft2(B_lam)
             idx2 = np.abs(B_lam_ifft) > self.as_threshold
@@ -766,14 +1025,11 @@ class wdd:
         ph_diff[idx] = self.diags[idx]/np.abs(self.diags[idx])
         degree = np.sum(weights,axis = (2,3))
         max_deg = np.max(degree)
-        # laplacian = - ph_diff * weights
-        # laplacian[:,:,self.wnd_size_c[0]-1,self.wnd_size_c[1]-1] += degree
         
         # We will search for top eigenvalue of  maxdeg*I - L = maxdeg*I - D + W \Phi
         laplacian = ph_diff * weights
         laplacian[:,:,self.wnd_size_c[0]-1,self.wnd_size_c[1]-1] +=(max_deg * np.ones_like(degree) - degree)
         
-        # sig,v = eigsh(laplacian,1,which = 'SM')
         # POWER METHOD 
         
         v = np.random.randn(self.dim_c_ext[0], self.dim_c_ext[1]) + 1.0j*np.random.randn(self.dim_c_ext[0], self.dim_c_ext[1])
@@ -822,6 +1078,11 @@ class wdd:
         if self.subspace_completion:
             self.subspace_completion()
             
+        if self.background == 'general':
+            self.background_general_coefficient_recovery()
+        elif self.background == 'phase':
+            self.background_phase_coefficient_recovery()
+            
         if self.memory_saving:
             self.construct_diags()
             self.reconstruct_magnitudes_from_diags()
@@ -831,19 +1092,6 @@ class wdd:
             self.reconstruct_magnitudes_from_lifted_matrix()
             self.angular_sync_from_lifted_matrix()
                 
-
-        # u_vec = np.arange(np.prod(self.dim_c_ext))
-        # u = np.reshape(u_vec,self.dim_c_ext)
-        
-        # u = np.random.rand(self.dim_c_ext[0],self.dim_c_ext[1])
-        # u_vec = np.reshape(u,(np.prod(self.dim_c_ext)))
-        
-        # e1 = self.x_lifted_comp[0,:] * u_vec
-        
-        # res1 = self.x_lifted_comp.dot(u_vec)
-        # res2 = self.multiply_via_diag(self.diags, u)
-        
-        # self.reconstruct_magnitudes()
         
         return self.construct_object()
         
