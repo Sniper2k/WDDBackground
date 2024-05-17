@@ -2,8 +2,6 @@ import numpy as np
 import sys
 sys.path.insert(1, '..')
 import time
-# import sigpy
-from skimage import data
 
 import forward as forward
 
@@ -11,16 +9,13 @@ import wigner_with_background_removal as wdd_background
 
 import wigner_2D as wdd
 
-
 import preprocessing as preprocessing
 
 import utility_2D as util
 from scipy.ndimage import zoom
 
-
 import cmath
 from skimage.color import rgb2hsv
-
 
 import matplotlib.pyplot as plt
 
@@ -61,9 +56,7 @@ def show_object(obj):
     ax[1].axis('off')
        
     plt.show()
-
-    
-    
+  
 def show_diffpat(obj):
     
     fig, ax = plt.subplots(nrows = 1, ncols = 1)
@@ -75,14 +68,11 @@ def show_diffpat(obj):
     plt.show()
     
 
+### Load cameraman and transfrom it ###
 
-# from PIL import Image
-# im_cam = Image.open("cameraman.tif")
-# im_cam = np.array(im_cam)
-
-### Load cameramen and transfrom it ###
-
-im_cam = data.camera()
+from PIL import Image
+im_cam = Image.open("cameraman.tif")
+im_cam = np.array(im_cam)
 
 outd = 128
 factor = outd*1.0/im_cam.shape[0]
@@ -147,8 +137,9 @@ show_diffpat(b[:,:,0])
 
 
 ### Background ###
-phantom = data.shepp_logan_phantom()
-phantom = zoom(phantom, outd*1.0/phantom.shape[0])
+
+phantom =  Image.open("phantom.tif")
+phantom = np.array(phantom)
 
 #sigpy.shepp_logan(dsize, dtype='float64')*255 
 
