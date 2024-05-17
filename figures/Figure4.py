@@ -1,39 +1,26 @@
 import numpy as np
 import sys
-sys.path.insert(1, '../model')
-sys.path.insert(1, '../algorithms')
-
+sys.path.insert(1, '..')
 import time
-import sigpy
-
-import forward as forward
-
-
-import wigner_2D as wdd
-
-import wigner_phase_object_background_removal as wdd_background
-
-import preprocessing as preprocessing
-
-
-import utility_2D as util
-from scipy.ndimage import zoom
-
-
 import cmath
+from scipy.ndimage import zoom
 from skimage.color import rgb2hsv
-
 import matplotlib.pyplot as plt
-
 from matplotlib.colors import LinearSegmentedColormap
-
 colors = ["black", "lightgray", "black"]
 cmap = LinearSegmentedColormap.from_list("", colors)
+from PIL import Image
 
+import utility_2D as util
+import forward as forward
+import preprocessing as preprocessing
 
+import wigner_2D as wdd
+import wigner_phase_object_background_removal as wdd_background
 
+### Helper functions ###
 
-def image_to_object(im,satur_parser):
+def image_to_phase_object(im,satur_parser):
     im_hsv = rgb2hsv(im)
        
     modulus = im_hsv[:,:,2] * 255 
@@ -43,7 +30,6 @@ def image_to_object(im,satur_parser):
     obj_mod =  np.exp(1.0j * phase)
     
     return obj_mod
-
 
 def show_object(obj):
     
@@ -56,14 +42,11 @@ def show_object(obj):
     phase_rgb = phase[:,:,0] 
     
     phase_rgb =  (np.angle(obj) - np.min(np.angle(obj))) / (np.max(np.angle(obj) -  np.min(np.angle(obj)))) * 2*np.pi - np.pi
-
     
     ax.imshow(phase_rgb,cmap =  cmap, vmin = -np.pi, vmax = np.pi, interpolation="nearest") 
     ax.axis('off')
        
-    plt.show()
-    
-    
+    plt.show()  
     
 def show_diffpat(obj):
     
@@ -76,11 +59,9 @@ def show_diffpat(obj):
     plt.show()
     
 
+### Load cameraman and transfrom it ###
 
-from PIL import Image
 im_cam = Image.open("cameraman.tif")
-
-
 im_cam = np.array(im_cam)
 
 outd = 128
@@ -90,26 +71,19 @@ im[:,:,0] = zoom(im_cam[:,:],factor)
 im[:,:,1] = zoom(im_cam[:,:],factor)
 im[:,:,2] = zoom(im_cam[:,:],factor)
 
-obj = image_to_object(im,lambda x,v: x)
-
-
-d = im.shape[0]
-
-
-delta = 16
-
-shift = 1
-
-f_dim = (d,d)
-
-dsize = f_dim
-
-
-locations_2d = forward.loc_grid_circ((d,d),(shift,shift),False)
-
+obj = image_to_phase_object(im,lambda x,v: x)
 
 show_object(obj)
 
+### Parameter Setup ###
+
+d = im.shape[0]
+delta = 16
+shift = 1
+f_dim = (d,d)
+dsize = f_dim
+
+### Construct Gaussian window ###
 
 cov_mat = np.eye(2,dtype = complex)/0.05
 mu = np.array([0.5 + delta*0.5, 0.5 + delta*0.5])
@@ -119,6 +93,7 @@ for ix in range(delta):
     for iy in range(delta):
         window[ix,iy] = gauss( np.array([ix+1, iy+1]))
 
+### Randomize it to avoid symmetry singularities ###
 
 np.random.seed(3); r1 = np.random.rand(delta,delta)
 np.random.seed(5); r2 = np.random.rand(delta,delta)
@@ -129,6 +104,7 @@ else:
 
 show_object(window)
            
+### Prepare ptycho object and generate the forward measurements ###   
 
 par = forward.ptycho(
             object_shape = obj.shape,
@@ -151,20 +127,21 @@ show_diffpat(b[:,:,0])
 
 ### Background ###
 
-phantom = sigpy.shepp_logan(dsize, dtype='float64')*255 
+phantom =  Image.open("phantom.tif")
+phantom = np.array(phantom)
+
+#phantom = sigpy.shepp_logan(dsize, dtype='float64')*255 
 
 background = np.zeros(b.shape, dtype = 'float64')
 for r in range(b.shape[2]):
             background[:,:,r] = phantom
 
 
-scaling = 17  
-#scaling = 2 # low noise
+scaling = 17 # higher distortion level
+#scaling = 2 # lower distortion level
 b_n = b +  scaling*background 
 
-
 show_diffpat(b_n[:,:,0])
-
 
 print('Noise level: ', util.relative_measurement_error(b,b_n))
 
