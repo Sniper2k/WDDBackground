@@ -10,7 +10,7 @@ import utility_2D as util
 
 import adp as adp
 import helper
-import wigner_2d as wdd
+import wigner_2D as wdd
 
 
 ## for Table 2: phase_object = 0
