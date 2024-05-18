@@ -11,7 +11,7 @@ and
 
 In paricular, the folder /figures contains scripts for generation of respective figures from [2]. See them for an example of code usage.
 
-Dependencies: numpy, scipy, matplotlib (examples), Pillow [PIL] (examples)
+Dependencies: numpy, scipy, matplotlib (/figures), Pillow [PIL] (/figures)
 
 In addition, repository includes our implementations of
 
