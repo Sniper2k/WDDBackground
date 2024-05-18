@@ -86,7 +86,7 @@
 # Type: bool
 # Default: False
 # If False, the straightforward implementation of WDD constructs banded matrix 
-# X = T(xx^*), see Section 6.3.1 in [1]. However, as number of recovered diagonalls 
+# X = T(xx^*), see Section 3.6.1 in [1]. However, as number of recovered diagonalls 
 # gamma is typically much smaller than the dimension d, entries of X are mostly zeros,
 # consuming the memory, especially in 2D. Setting memory_saving to True, avoids construction
 # of X and performs magnitude and phase estimation directly from the diagonals.
