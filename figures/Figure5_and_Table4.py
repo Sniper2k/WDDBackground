@@ -89,7 +89,7 @@ for snr in range(trials):
         
     ## Background ##
     
-    phantom =  Image.open("phantom.tif")
+    phantom =  Image.open("phantom_64.tif")
     phantom = np.array(phantom)    
     phantom = np.maximum(phantom, np.zeros_like(phantom))
     
@@ -232,7 +232,7 @@ plt.show()
 factor = 2 * 10**(-5)
 
 ## Background ##
-phantom =  Image.open("phantom.tif")
+phantom =  Image.open("phantom_64.tif")
 phantom = np.array(phantom)
 phantom = np.maximum(phantom, np.zeros_like(phantom))
 
