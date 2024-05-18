@@ -39,7 +39,7 @@ Optional:
  
 Required parameters:
 
---> ptycho: 
+- ptycho: 
 
 Type: object from forward, describes the forward model 
 
@@ -50,7 +50,7 @@ If ptycho.shift > 1, then the object to be recovered is assumed to be block-cons
 
 Optional parameters:
 
---> gamma 
+- gamma 
 
 Type: integer from 1 to self.par.window_shape[0]//self.par.shift[0] (all diagonals)
 
@@ -58,13 +58,13 @@ Default: all diagonals
 
 number of diagonals to use for reconstruction. See Assumption A in [2] for details.
  
---> reg_type
+- reg_type
 
 Type: string, either 'value' or 'percent'
 
 Default: 'value'
 
---> reg_threshold
+- reg_threshold
 
 Type: float  
 
@@ -74,7 +74,7 @@ Parameters for regularization of the inversion step by truncation, see Section 3
 When 'value' is chosen, diagonal Fourier coefficients corresponding to singular values below reg_threshold are set to zero
 When 'percent' is chosen, diagonal Fourier coefficients corresponding to singular values less then quantile(reg_threshold) are set to zero 
 
---> mg_type
+- mg_type
 
 Type: string, either 'diag' or 'log'
 
@@ -82,13 +82,13 @@ Default: 'diag'
 
 Determines, which magnitude estimation method to use, see Section 3.6.3 in [1]
 
---> mg_diagonals_type
+- mg_diagonals_type
 
 Type: string, either 'all', 'value' or 'percent'
 
 Default: 'all'
 
---> mg_diagonals_param
+- mg_diagonals_param
 
 Type: float 
 
@@ -98,7 +98,7 @@ If 'value', only mg_diagonals_param of the first diagonals are used, in analogy 
 If 'percent', only diagonals where percentage of non-truncated Fourier coefficients exceeds mg_diagonals_param are used.
 For details, see Section 6.1.2.2 in [1]
 
---> as_wtype
+- as_wtype
 
 Type: string, either 'unweighted','weighted' or 'weighted_sq_amp'
 
@@ -107,22 +107,22 @@ Default: 'weighted'
 Choice of weights for phase synchronization. These three choices were discussed in Section 3.6.4 in [1]
 Uses mg_diagonals_type, mg_diagonals_param the same way as magnitude estimation in case memory_saving=True. 
 
---> as_threshold
+- as_threshold
 
 Type: float 
 
-Default: 10**-10
+Default: 10^-10
 
 When constructing the graph for phase syncronization from lifted matrix, its entries below as_threshold 
 are treated as zeros. In other words, the corresponding phase differences are not used.
 
---> background 
+- background 
 
 Type: string, either 'none','general' or 'phase'
 
 Default: 'none'
  
---> add_dummy
+- add_dummy
 
 Type: bool
 
@@ -132,7 +132,7 @@ Only considered when using WDD for noncircular measurements (ptycho.circular = F
 When False, there is less measurements than WDD needs. Recomendation to change the dimension d to d - window.shape / shift + 1  
 When True, dimensional changes are not required. Instead, the algorithm will set the missing diffraction patters to 0. This results in border in the reconstruction
 
---> memory_saving
+- memory_saving
 
 Type: bool
 
@@ -140,12 +140,12 @@ Default: False
 
 If False, the straightforward implementation of WDD constructs banded matrix. X = T(xx^*), see Section 6.3.1 in [1]. However, as number of recovered diagonalls gamma is typically much smaller than the dimension d, entries of X are mostly zeros, consuming the memory, especially in 2D. Setting memory_saving to True, avoids construction of X and performs magnitude and phase estimation directly from the diagonals. This results in a smaller memmory consumption, however slows down the reconstruction as the phase estimation runs power method instead of using scipy.sparse.linalg.eigsh    
 
---> xt
+- xt
 
 Type: np.ndarray
 
 Default: empty
 
-Groundtruth object for testing purposes.
+Ground-truth object for testing purposes.
 
---> subspace completing parameters can be ignored
+- subspace completing parameters can be ignored
