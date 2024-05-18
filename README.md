@@ -3,11 +3,11 @@
 
 Implementation is based on 
 
-[1] Oleh Melnyk, Phase Retrieval from Short-Time Fourier Measurements and Applications to Ptychography, PhD thesis, Technische Universitaet Muenchen, 2023
+[1] Oleh Melnyk, Phase Retrieval from Short-Time Fourier Measurements and Applications to Ptychography, PhD thesis, Technische Universität München, 2023
 
 and
 
-[2] Oleh Melnyk, Patricia Römer, Background Denoising for Ptychography via Wigner Distribution Deconvolution
+[2] Oleh Melnyk, Patricia Römer, Background Denoising for Ptychography via Wigner Distribution Deconvolution, arXiv:2402.15353v1
 
 In paricular, the folder /figures contains scripts for generation of respective figures from [2]. See them for an example of code usage.
 
@@ -121,6 +121,9 @@ are treated as zeros. In other words, the corresponding phase differences are no
 Type: string, either 'none','general' or 'phase'
 
 Default: 'none'
+
+The background removal proceedure. If 'none', this step is omitted. If 'general' or 'phase', background is removed according to Algorithms 2 and, respectively, 3 in [2]. 
+
  
 - add_dummy
 
