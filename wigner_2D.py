@@ -78,7 +78,7 @@
 # Default: False
 # Only considered when using WDD for noncircular measurements (ptycho.circular = False)
 # When False, there is less measurements than WDD needs. Recomendation to change 
-# the dimension d to d - window.shape / shift + 1  
+# the dimension d to d - window.shape + shift
 # When True, dimensional changes are not required. Instead, the algorithm will set the 
 # missing diffraction patters to 0. This results in border in the reconstruction
 #
