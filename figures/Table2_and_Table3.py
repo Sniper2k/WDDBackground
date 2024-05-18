@@ -86,7 +86,10 @@ b = par.forward_to_meas_2D_pty(f)
 
 ### Background ###
 
-phantom =  Image.open("phantom.tif")
+if d == 64:
+    phantom =  Image.open("phantom_64.tif")
+if d == 96:
+    phantom =  Image.open("phantom_96.tif")
 phantom = np.array(phantom)
 
 background = np.zeros(b.shape,dtype = 'float64')
