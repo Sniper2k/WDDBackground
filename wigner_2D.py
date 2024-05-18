@@ -70,6 +70,9 @@
 # Type: string, either 'none','general' or 'phase'
 # Default: 'none'
 # 
+# The background removal proceedure. If 'none', this step is omitted.
+# If 'general' or 'phase', background is removed according to Algorithms 2 and, respectively, 3 in [2]. 
+#
 # --> add_dummy
 # Type: bool
 # Default: False
