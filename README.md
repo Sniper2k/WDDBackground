@@ -73,8 +73,8 @@ Type: float
 Default: 0.0
 
 Parameters for regularization of the inversion step by truncation, see Section 3.6.2.2 in [1]. 
-When 'value' is chosen, diagonal's Fourier coefficients corresponding to singular values below reg_threshold are set to zero.
-When 'percent' is chosen, diagonal's Fourier coefficients corresponding to singular values less then quantile(reg_threshold) are set to zero. 
+When 'value' is chosen, the diagonal's Fourier coefficients corresponding to singular values below reg_threshold are set to zero.
+When 'percent' is chosen, the diagonal's Fourier coefficients corresponding to singular values less then quantile(reg_threshold) are set to zero. 
 
 - mg_type
 
@@ -96,8 +96,8 @@ Type: float
 
 mg_diagonals_type determines whether all diagonals should be used for magnitude estimation. 
 
-If 'value', only mg_diagonals_param of the first diagonals are used, in analogy for gamma. 
-If 'percent', only diagonals where percentage of non-truncated Fourier coefficients exceeds mg_diagonals_param are used.
+If 'value', only mg_diagonals_param of the first diagonals are used, in analogy to gamma. 
+If 'percent', only the diagonals where the percentage of non-truncated Fourier coefficients exceeds mg_diagonals_param are used.
 For details, see Section 6.1.2.2 in [1].
 
 - as_wtype
@@ -115,7 +115,7 @@ Type: float
 
 Default: 10^-10
 
-When constructing the graph for phase syncronization from lifted matrix, its entries below as_threshold. 
+When constructing the graph for phase syncronization from lifted matrix, its entries below as_threshold 
 are treated as zeros. In other words, the corresponding phase differences are not used.
 
 - background 
@@ -124,7 +124,7 @@ Type: string, either 'none','general' or 'phase'
 
 Default: 'none'
 
-The background removal proceedure. If 'none', this step is omitted. If 'general' or 'phase', background is removed according to Algorithms 2 and, respectively, 3 in [2]. 
+The background removal procedure. If 'none', this step is omitted. If 'general' or 'phase', background is removed according to Algorithms 2 and, respectively, 3 in [2]. 
 
  
 - add_dummy
@@ -134,7 +134,7 @@ Type: bool
 Default: False
 
 Only considered when using WDD for noncircular measurements (ptycho.circular = False).
-When False, there is less measurements than WDD needs. Recommendation to change the dimension d to d - window.shape + shift.
+When False, there are less measurements than WDD needs. Recommendation to change the dimension d to d - window.shape + shift.
 When True, dimensional changes are not required. Instead, the algorithm will set the missing diffraction patterns to 0. This results in border in the reconstruction.
 
 - memory_saving
