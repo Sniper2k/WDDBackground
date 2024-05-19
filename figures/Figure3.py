@@ -11,7 +11,7 @@ import helper
 import utility_2D as util
 from scipy.ndimage import zoom
 
-### Load cameraman and transfrom it ###
+### Load cameraman and transform it ###
 
 from PIL import Image
 im_cam = Image.open("cameraman.tif")
