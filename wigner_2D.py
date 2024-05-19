@@ -314,7 +314,7 @@ class wdd:
         
         # If we don't work with circular object and measurements,
         # we need to append object with dummy variables
-        # with is the size of the window
+        # which is of the size of the window
         # (potentially size of the window -1, but it breaks divisibility of dimension)
         if (self.par.circular == False and self.add_dummy == True):
             self.object_shape_ext = self.par.object_shape + self.par.window_shape
@@ -1071,8 +1071,24 @@ class wdd:
         ph_diff[idx] = self.x_lifted_comp[idx]/np.abs(self.x_lifted_comp[idx])
         degree = np.sum(weights,axis = 1)
         laplacian = np.diag(degree) - ph_diff * weights
-        sig,v = eigsh(laplacian,1,which = 'SM')
-        
+
+        # Greedy angular synchronization as initialization
+        v_init = np.ones(np.shape(laplacian)[0], dtype = 'complex')
+        for j in range(self.dim_c_ext[0]):
+            x_lifted_comp_block = self.x_lifted_comp[j * self.dim_c_ext[1] : (j+1) * self.dim_c_ext[0], j * self.dim_c_ext[1] : (j+1) * self.dim_c_ext[0] ]  
+            first_diag = np.diag(np.roll(x_lifted_comp_block, -1, axis = 1))
+            idx_f_diag = np.abs(first_diag) > self.as_threshold
+            first_diag_norm = np.ones_like(first_diag)
+            first_diag_norm[idx_f_diag] = first_diag[idx_f_diag] / np.abs(first_diag[idx_f_diag])
+            starting = np.ones(self.dim_c_ext[1],dtype = complex)
+            if j > 0:
+                starting[0] = self.x_lifted_comp[j * self.dim_c_ext[1],(j-1) * self.dim_c_ext[1]] / np.conj(v_init[(j-1) * self.dim_c_ext[1]])
+            for k in range(self.dim_c_ext[1]-1):
+                starting[k+1] = (first_diag_norm[k]/starting[k]).conj()
+            v_init[j * self.dim_c_ext[1] : (j+1) * self.dim_c_ext[0]] = starting
+    
+        sig,v = eigsh(laplacian, 1, which = 'SM', v0 = v_init, maxiter = 5*np.sqrt(self.dim_c_ext[0]*self.dim_c_ext[1]))
+                
         self.phases = v[:,0]
         idx = np.abs(self.phases)>self.as_threshold
         self.phases[idx] = self.phases[idx]/np.abs(self.phases[idx]) 
