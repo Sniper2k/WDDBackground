@@ -1,12 +1,10 @@
 """
 Based on 'Advanced denoising for X-ray ptychography' (Chang et al., 2019)
-
 """
 
 import numpy as np
 import forward as forward
 import utility_2D as util
-
 
 
 def ADP(window,b,d,delta,s,J,positions,K,alpha1,alpha2,r,J_0,obj_wdd,background,obj_gt,meas_gt):
@@ -32,10 +30,8 @@ def ADP(window,b,d,delta,s,J,positions,K,alpha1,alpha2,r,J_0,obj_wdd,background,
     Lambda1 = np.zeros([d,d,J],dtype = complex)
     Lambda2 = np.zeros([d,d,J],dtype = complex)
     
-    
     rel_err = np.zeros([1,K])
     meas_err = np.zeros([1,K])
-    
     
     S_T_omega_abs = np.zeros([2*d,2*d,J],dtype = complex)
     for j in range(J):      
@@ -53,8 +49,6 @@ def ADP(window,b,d,delta,s,J,positions,K,alpha1,alpha2,r,J_0,obj_wdd,background,
             S_T_omega_F[positions[j,0]:(positions[j,0]+delta),positions[j,1]:(positions[j,1]+delta),j]  = par.forward_adj_2D_os(z[:,:,j] + Lambda1[:,:,j]) 
 
         S_T_omega_F = 1/J *( S_T_omega_F[0:d,0:d,:] + S_T_omega_F[0:d,d:,:]  + S_T_omega_F[d:,0:d,:] + S_T_omega_F[d:,d:,:])
-        
-        
         
         u = (np.sum(S_T_omega_F,axis = 2) + alpha2 * u) / (np.sum(S_T_omega_abs,axis = 2) + alpha2 * np.ones([d,d]))
 
@@ -78,7 +72,6 @@ def ADP(window,b,d,delta,s,J,positions,K,alpha1,alpha2,r,J_0,obj_wdd,background,
         
         Lambda2 += mu - MU_k
         
-        
         if(np.mod(k+1,J_0) == 0):
             mu_k = np.sqrt(np.maximum(np.zeros_like(np.sum(b,axis=2)), 1/J*np.sum(b - np.abs(A_omega_u)**2,axis=2)))
             mu = np.dstack([mu_k] * J)
@@ -93,9 +86,7 @@ def ADP(window,b,d,delta,s,J,positions,K,alpha1,alpha2,r,J_0,obj_wdd,background,
         b_r = par.forward_to_meas_2D_pty(A_omega_u)
         meas_err[0,k] = util.relative_measurement_error(meas_gt,b_r)
         del A_omega_u
-        
-        print(rel_err[0,k],meas_err[0,k])
-    
+            
     background = background ** 2
     
     return u, background, rel_err, meas_err
