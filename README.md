@@ -9,11 +9,11 @@ and
 
 [2] Oleh Melnyk, Patricia Römer, Background Denoising for Ptychography via Wigner Distribution Deconvolution, arXiv:2402.15353v1
 
-In particular, the folder /figures contains scripts for generation of respective figures from [2]. See them for an example of code usage.
+In particular, the folder /figures contains scripts for generating the respective figures from [2]. See them for an example of code usage.
 
 Dependencies: numpy, scipy, matplotlib (/figures), Pillow [PIL] (/figures)
 
-In addition, repository includes our implementations of
+In addition, the repository includes our implementations of
 
 - [adp.py] ADP algorithm based on:
 
@@ -23,9 +23,9 @@ Huibin Chang, Pablo Enfedaque, Jie Zhang, Juliane Reinhardt, Bjoern Enders, Youn
 
 Chunpeng Wang, Zijian Xu, Haigang Liu, Yong Wang, Jian Wang, and Renzhong Tai. Background noise removal in x-ray ptychography. Applied optics, 56(8):2099–2111, 2017.
 
-Below, the use of the WDD class is described 
+Below, the use of the WDD class is described. 
 
-The algorithm consists of 3 mains steps and 1 optional step
+The algorithm consists of 3 mains steps and 1 optional step:
 
 Main: 
 
@@ -45,9 +45,9 @@ Required parameters:
 
 Type: object from forward.py, describes the forward model 
 
-For WDD, scanning positions ptycho.locations should form a equdistant grid with step ptycho.shift. Use loc_type='grid' for ptycho class. 
+For WDD, the scanning positions ptycho.locations should form a equdistant grid with step ptycho.shift. Use loc_type='grid' for ptycho class. 
 Furthermore, the shifts are circular, so that ptycho.circular = True. 
-If ptycho.circular = False, algorithm works and treats noncircular measurements in two possible ways, see parameter add_dummy below. 
+If ptycho.circular = False, the algorithm works and treats noncircular measurements in two possible ways, see parameter add_dummy below. 
 If ptycho.shift > 1, then the object to be recovered is assumed to be block-constant, see Section 3.6.5.1 in [1].    
 
 Optional parameters:
