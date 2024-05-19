@@ -14,7 +14,7 @@ import preprocessing as preprocessing
 import wigner_2D as wdd
 
 
-### Load cameraman and transfrom it ###
+### Load cameraman and transform it ###
 
 im_cam = Image.open("cameraman.tif")
 im_cam = np.array(im_cam)
