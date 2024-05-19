@@ -36,6 +36,8 @@ Main:
 Optional:
 
 1.5) Background Removal    
+
+
  
 Required parameters:
 
@@ -45,7 +47,7 @@ Type: object from forward.py, describes the forward model
 
 For WDD, scanning positions ptycho.locations should form a equdistant grid with step ptycho.shift. Use loc_type='grid' for ptycho class. 
 Furthermore, the shifts are circular, so that ptycho.circular = True. 
-If ptycho.circular = False, algorithm works and treats in two possible ways, see parameter add_dummy below. 
+If ptycho.circular = False, algorithm works and treats noncircular measurements in two possible ways, see parameter add_dummy below. 
 If ptycho.shift > 1, then the object to be recovered is assumed to be block-constant, see Section 3.6.5.1 in [1].    
 
 Optional parameters:
