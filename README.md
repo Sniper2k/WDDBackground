@@ -3,11 +3,12 @@
 
 This code is an implementation of the Wigner Distribution Deconvolution (WDD) algorithm for ptychography. The implementation is based on 
 
-[1] Oleh Melnyk, Phase Retrieval from Short-Time Fourier Measurements and Applications to Ptychography, PhD thesis, Technische Universität München, 2023
+[1] Oleh Melnyk, Phase Retrieval from Short-Time Fourier Measurements and Applications to Ptychography, PhD thesis, Technische Universität München, 2023,
+[https://mediatum.ub.tum.de/1661348](https://mediatum.ub.tum.de/1661348)
 
 and
 
-[2] Oleh Melnyk, Patricia Römer, Background Denoising for Ptychography via Wigner Distribution Deconvolution, arXiv:2402.15353v1
+[2] Oleh Melnyk, Patricia Römer, Background Denoising for Ptychography via Wigner Distribution Deconvolution, [arXiv:2402.15353v1](https://arxiv.org/abs/2402.15353v1)
 
 In particular, the folder /figures contains scripts for generating the respective figures from [2]. See them for an example of code usage.
 
