@@ -23,8 +23,32 @@ Huibin Chang, Pablo Enfedaque, Jie Zhang, Juliane Reinhardt, Bjoern Enders, Youn
 
 Chunpeng Wang, Zijian Xu, Haigang Liu, Yong Wang, Jian Wang, and Renzhong Tai. Background noise removal in x-ray ptychography. Applied optics, 56(8):2099–2111, 2017.
 
-Below, the use of the WDD class is described. 
+Legal Information & Credits
+---
 
+Copyright (c) 2024 Oleh Melnyk and Patricia Römer
+
+This software was written by [Oleh Melnyk](https://olehmelnyk.xyz/) and [Patricia Römer](https://www.math.cit.tum.de/math/personen/wissenschaftliches-personal/patricia-roemer/).
+It was developed at the Institute of Mathematics at Technical University of Berlin, Institute of Biomedical Imaging at Helmholtz Center Munich and Department of Mathematics at Technical University of Munich.
+The authors acknowledge supported by the Helmholtz Association under the contracts No.~ZT-I-0025 (Ptychography 4.0), No.~ZT-I-PF-4-018 (AsoftXm), No.~ZT-I-PF-5-28 (EDARTI), No.~ZT-I-PF-4-024 (BRLEMMM). Patricia Römer acknowledges further financial support by the German Research Foundation (DFG) grants KR 4512/1-1 and KR 4512/2-2.
+
+WDDBackground is free software. You can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software
+Foundation; either version 2 of the License, or (at your option) any later
+version. If not stated otherwise, this applies to all files contained in this
+package and its sub-directories.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+Description of WDD class
+---
 The algorithm consists of 3 mains steps and 1 optional step:
 
 Main: 
@@ -36,8 +60,6 @@ Main:
 Optional:
 
 1.5) Background Removal    
-
-
  
 Required parameters:
 
