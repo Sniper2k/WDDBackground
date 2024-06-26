@@ -36,13 +36,13 @@ im[:,:,1] = zoom(im_boat[:,:],factor_boat)
 im[:,:,2] = zoom(im_boat[:,:],factor_boat)
 
 factor = outd*1.0/im_cam.shape[0]
-im = np.zeros((outd,outd,3))
-im[:,:,0] = zoom(im_cam[:,:],factor)
-im[:,:,1] = zoom(im_cam[:,:],factor)
-im[:,:,2] = zoom(im_cam[:,:],factor)
+im_phase = np.zeros((outd,outd,3))
+im_phase[:,:,0] = zoom(im_cam[:,:],factor)
+im_phase[:,:,1] = zoom(im_cam[:,:],factor)
+im_phase[:,:,2] = zoom(im_cam[:,:],factor)
 
 if phase_object == 1:
-    obj = helper.image_to_phase_object(im,lambda x,v: x)
+    obj = helper.image_to_phase_object(im_phase,lambda x,v: x)
 else:
     obj = helper.image_to_object(im,im_phase,lambda x,v: x)
 
