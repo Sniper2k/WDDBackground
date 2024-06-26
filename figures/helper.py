@@ -12,11 +12,13 @@ from matplotlib.colors import LinearSegmentedColormap
 import cmath
 
 
-def image_to_object(im,satur_parser):
-    im_hsv = rgb2hsv(im)
-       
-    modulus = im_hsv[:,:,2] * 255 
-    phase = (modulus - np.min(modulus)) / (np.max(modulus) - np.min(modulus)) * 2*np.pi - np.pi
+def image_to_object(modulus,phase,satur_parser):
+    modulus_hsv = rgb2hsv(modulus)
+    phase_hsv = rgb2hsv(phase)
+    
+    modulus = modulus_hsv[:,:,2] * 255 
+    phase = phase_hsv[:,:,2] * 255
+    phase = (phase - np.min(phase)) / (np.max(phase) - np.min(phase)) * 2*np.pi - np.pi
     
     obj_mod = modulus * np.exp(1.0j * phase)
     
