@@ -500,7 +500,10 @@ class wdd:
         # Reconstruct zeroth frequencies
         
         count = 0
-        size_lin_syst = 2
+        if self.reg_threshold == 0:
+            size_lin_syst = 2
+        else:
+            size_lin_syst = 4
         
         for k0 in range(self.gamma):
 
