@@ -50,7 +50,7 @@ def show_object(obj):
     phase_rgb =  (np.angle(obj) - np.min(np.angle(obj))) / (np.max(np.angle(obj) -  np.min(np.angle(obj)))) * 2*np.pi - np.pi# + cmath.pi)/(2*cmath.pi) 
 
 
-    ax[0].imshow(modulus, cmap = 'gray', vmin = 0, vmax  = 2*65025 - 4000)
+    ax[0].imshow(modulus, cmap = 'gray', vmin = 0, vmax  = 127500)
     ax[0].axis('off')
     
     ax[1].imshow(phase_rgb,cmap =  cmap, vmin = -np.pi, vmax = np.pi, interpolation="nearest") 
