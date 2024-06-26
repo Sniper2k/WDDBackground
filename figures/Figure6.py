@@ -39,7 +39,7 @@ helper.show_object(obj)
 ### Parameter Setup ###
 
 d = im.shape[0]
-delta = 16
+delta = 24
 shift = 2 # 4 # 8
 f_dim = (d,d)
 dsize = f_dim
@@ -169,17 +169,18 @@ locations_2d = forward.loc_grid_circ((d,d),(shift,shift), False)
 positions = locations_2d
 
 J = d**2 // shift**2
+r = 10**(-1)
 alpha1 = 0 
 if shift == 2:
     alpha2 = 10**3
-    K = 25
+    K = 20
 elif shift == 4:
     alpha2 = 10**(3.5)
     K = 50 
 elif shift == 8:
-    alpha2 = 10**4
-    K = 50 
-r = 10**(-1)
+    alpha2 = 10**4.5
+    K = 250 
+    r = 10**(-2)
 J_0 = 2
 
 background_init = np.dstack([np.zeros([d,d] , dtype = 'complex')] * J)
