@@ -21,14 +21,23 @@ import adp as adp
 im_cam = Image.open("cameraman.tif")
 im_cam = np.array(im_cam)
 
-outd = 64 
-factor = outd*1.0/im_cam.shape[0]
-im = np.zeros((outd,outd,3))
-im[:,:,0] = zoom(im_cam[:,:],factor)
-im[:,:,1] = zoom(im_cam[:,:],factor)
-im[:,:,2] = zoom(im_cam[:,:],factor)
+im_boat = Image.open("boat.png")
+im_boat = np.array(im_boat)
 
-obj = helper.image_to_object(im,lambda x,v: x)
+outd = 32
+factor_boat = outd*1.0/im_boat.shape[0]
+im = np.zeros((outd,outd,3))
+im[:,:,0] = zoom(im_boat[:,:],factor_boat)
+im[:,:,1] = zoom(im_boat[:,:],factor_boat)
+im[:,:,2] = zoom(im_boat[:,:],factor_boat)
+
+factor = outd*1.0/im_cam.shape[0]
+im_phase = np.zeros((outd,outd,3))
+im_phase[:,:,0] = zoom(im_cam[:,:],factor)
+im_phase[:,:,1] = zoom(im_cam[:,:],factor)
+im_phase[:,:,2] = zoom(im_cam[:,:],factor)
+
+obj = helper.image_to_object(im,im_phase,lambda x,v: x)
 
 ### Parameter Setup ###
 
@@ -77,7 +86,7 @@ b = par.forward_to_meas_2D_pty(f)
 
 ### Figure 5 ###
 
-trials = 20
+trials = 100
 
 noiselevel = np.zeros(trials)
 subtraction_vanillaWDD_relerr = np.zeros(trials)
@@ -97,21 +106,21 @@ for snr in range(trials):
     for r in range(b.shape[2]):
                 background[:,:,r] = phantom
         
-    factor = 5 * 10**(-6)  * (snr+4)
+    factor = 5 * 10**(-6)  * (0.25*snr+4)
     scaling = 10 / factor**2 
     
     b_n = b +  scaling*background 
     
     ## Poisson noise ##
-    scaling_p = factor**2 
+    scaling_p = factor**2 * 0.75
     b_scaled =  scaling_p * b_n
-    np.random.seed(2); b_n = np.random.poisson(b_scaled, b_scaled.shape) / scaling_p
+    np.random.seed(1); b_n = np.random.poisson(b_scaled, b_scaled.shape) / scaling_p
     
     print('Noise level: ', util.relative_measurement_error(b,b_n))
    
     noiselevel[snr] = util.relative_measurement_error(b,b_n)
     
-    reg_thresh = 0.6 / (0.1 * snr**2 + 1)
+    reg_thresh = np.max(np.array([0.6 - 0.01 * snr, 0.1]))
     
     ### Vanilla WDD after background subtraction ###
         
@@ -123,7 +132,7 @@ for snr in range(trials):
     b_dark = par.forward_to_meas_2D_pty(f_dark)
     b_dark_n = b_dark + scaling * background 
     b_scaled =  scaling_p * b_dark_n 
-    np.random.seed(5); b_dark_n = np.random.poisson(b_scaled, b_scaled.shape) / scaling_p
+    np.random.seed(1); b_dark_n = np.random.poisson(b_scaled, b_scaled.shape) / scaling_p
 
     # compute forward model of window (no object)
     no_obj = np.ones_like(obj) 
@@ -210,17 +219,15 @@ for snr in range(trials):
     print( 'Relative measurement error: ', util.relative_measurement_error(b,b_r))
  
     proposedWDD_relerr[snr] = util.relative_error(obj,obj_r,par.mask)
+    
 
-    obj_r_init = obj_r
-
-
-plt.figure(figsize=(20,10))
-plt.plot(noiselevel,np.log10(subtraction_vanillaWDD_relerr), linewidth= 8.0, color="#005293",  linestyle='dashed')
-plt.plot(noiselevel,np.log10(proposedWDD_relerr), linewidth= 8.0, color="#a2ad00") 
-plt.tick_params(axis='both', labelsize=42)
-plt.legend(['vanilla WDD after background subtraction','proposed method'], fontsize = 42, loc = 4)
-plt.ylabel('$log_{10}$ (rel. rec. err.)', fontsize = 42)
-plt.xlabel('noise level', fontsize = 42)
+plt.figure(figsize=(28,14))
+plt.plot(noiselevel,(proposedWDD_relerr), linewidth= 12.0, color="#a2ad00")
+plt.plot(noiselevel,(subtraction_vanillaWDD_relerr), linewidth= 10.0, color="#005293", linestyle='dashed') 
+plt.tick_params(axis='both', labelsize=60)
+plt.legend(['proposed method','vanilla WDD after background subtraction'], fontsize = 60, loc = 4)
+plt.ylabel('relative reconstruction error', fontsize = 60)
+plt.xlabel('noise level', fontsize = 60)
 plt.show()
     
 
@@ -247,7 +254,7 @@ b_n = b +  scaling*background
 ## Poisson noise ##
 scaling_p = factor**2 
 b_scaled =  scaling_p * b_n
-np.random.seed(2); b_n = np.random.poisson(b_scaled, b_scaled.shape) / scaling_p
+np.random.seed(1); b_n = np.random.poisson(b_scaled, b_scaled.shape) / scaling_p
 
 print('Noise level: ', util.relative_measurement_error(b,b_n))
 
