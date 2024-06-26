@@ -504,6 +504,9 @@ class wdd:
             size_lin_syst = 2
         else:
             size_lin_syst = 4
+
+        if self.wnd_size_c[0] <= 3 or self.wnd_size_c[1] <= 3:
+                size_lin_syst = min(self.dim_c_ext[0],self.dim_c_ext[1]) - 1
         
         for k0 in range(self.gamma):
 
