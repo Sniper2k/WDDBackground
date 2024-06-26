@@ -120,7 +120,7 @@ for snr in range(trials):
    
     noiselevel[snr] = util.relative_measurement_error(b,b_n)
     
-    reg_thresh = np.max(np.array([0.6 - 0.01 * snr, 0.1]))
+    reg_thresh = max(0.6 - 0.01 * snr, 0.1)
     
     ### Vanilla WDD after background subtraction ###
         
