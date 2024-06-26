@@ -29,6 +29,12 @@ im_cam = Image.open("cameraman.tif")
 im_cam = np.array(im_cam)
 
 outd = 64 #96 
+factor_boat = outd*1.0/im_boat.shape[0]
+im = np.zeros((outd,outd,3))
+im[:,:,0] = zoom(im_boat[:,:],factor_boat)
+im[:,:,1] = zoom(im_boat[:,:],factor_boat)
+im[:,:,2] = zoom(im_boat[:,:],factor_boat)
+
 factor = outd*1.0/im_cam.shape[0]
 im = np.zeros((outd,outd,3))
 im[:,:,0] = zoom(im_cam[:,:],factor)
@@ -38,7 +44,7 @@ im[:,:,2] = zoom(im_cam[:,:],factor)
 if phase_object == 1:
     obj = helper.image_to_phase_object(im,lambda x,v: x)
 else:
-    obj = helper.image_to_object(im,lambda x,v: x)
+    obj = helper.image_to_object(im,im_phase,lambda x,v: x)
 
 ### Parameter Setup ###
 
