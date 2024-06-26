@@ -20,13 +20,19 @@ im_cam = Image.open("cameraman.tif")
 im_cam = np.array(im_cam)
 
 outd = 128
-factor = outd*1.0/im_cam.shape[0]
+factor_boat = outd*1.0/im_boat.shape[0]
 im = np.zeros((outd,outd,3))
-im[:,:,0] = zoom(im_cam[:,:],factor)
-im[:,:,1] = zoom(im_cam[:,:],factor)
-im[:,:,2] = zoom(im_cam[:,:],factor)
+im[:,:,0] = zoom(im_boat[:,:],factor_boat)
+im[:,:,1] = zoom(im_boat[:,:],factor_boat)
+im[:,:,2] = zoom(im_boat[:,:],factor_boat)
 
-obj = helper.image_to_object(im,lambda x,v: x)
+factor = outd*1.0/im_cam.shape[0]
+im_phase = np.zeros((outd,outd,3))
+im_phase[:,:,0] = zoom(im_cam[:,:],factor)
+im_phase[:,:,1] = zoom(im_cam[:,:],factor)
+im_phase[:,:,2] = zoom(im_cam[:,:],factor)
+
+obj = helper.image_to_object(im,im_phase,lambda x,v: x)
 
 helper.show_object(obj)
 
