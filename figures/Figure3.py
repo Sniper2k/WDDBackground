@@ -100,7 +100,7 @@ for r in range(b.shape[2]):
 
 
 scaling = 25 * 10**8 # lower noise
-#scaling = 25 * 10**9 # higher noise
+#scaling = 22 * 10**9 # higher noise
 
 
 b_n = b +  scaling*background 
