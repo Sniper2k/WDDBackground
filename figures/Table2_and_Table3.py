@@ -19,9 +19,9 @@ import wigner_2D as wdd
 phase_object = 1 # 0
 
 if phase_object == 1:
-    backgrount_type = 'phase'
+    background_type = 'phase'
 else:
-    backgrount_type = 'general'
+    background_type = 'general'
 
 ### Load cameraman and transform it ###
 
@@ -126,7 +126,7 @@ wignerb = wdd.wdd(b_n,
                   subspace_completion = False,
                   sbc_threshold = 0.0,
                   memory_saving = False,
-                  background = backgrount_type)
+                  background = background_type)
 
 
 print('Reconstructing...')
@@ -159,7 +159,7 @@ wignerb = wdd.wdd(b_n,
                   subspace_completion = False,
                   sbc_threshold = 0.0,
                   memory_saving = False,
-                  background = backgrount_type)
+                  background = background_type)
 
 print('Reconstructing...')
 
@@ -183,8 +183,8 @@ positions = locations_2d
 
 J = d**2
 alpha1 = 0 
-alpha2 = 0.5
-r = 10**(-6)
+alpha2 = 100
+r = 10**(-3)
 K = 10 
 J_0 = 5
 
